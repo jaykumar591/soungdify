@@ -21,6 +21,10 @@ h1{font-size:28px;margin:18px 0}.sub{color:#aaa}.grid{display:grid;grid-template
 .controls{text-align:center}.buttons{display:flex;justify-content:center;align-items:center;gap:18px}.buttons button{background:none;border:0;color:#fff;font-size:17px;cursor:pointer}.buttons .play{background:#fff;color:#000;border-radius:50%;width:38px;height:38px}.progress{display:flex;gap:8px;align-items:center;font-size:10px;color:#888}.bar{height:4px;background:#555;border-radius:5px;flex:1;cursor:pointer}.fill{height:100%;background:#fff;width:0;border-radius:5px}.right{display:flex;justify-content:flex-end;gap:12px;align-items:center}.vol{width:100px}
 .toast{position:fixed;right:20px;bottom:110px;background:#222;padding:12px 16px;border-radius:8px;display:none;z-index:20}
 .empty{padding:50px;text-align:center;color:#888}.loader{text-align:center;padding:30px;color:#aaa}
+.artist-list{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:thin}
+.artist-chip{flex:0 0 auto;background:#222;border:1px solid #383838;color:#ddd;border-radius:20px;padding:9px 14px;cursor:pointer;font-size:13px}
+.artist-chip:hover,.artist-chip[aria-pressed="true"]{background:#1ed760;border-color:#1ed760;color:#071108}
+.artist-chip:focus-visible,.playmini:focus-visible,.buttons button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 @media(max-width:800px){.sidebar{width:70px;padding:20px 8px}.logo{font-size:0}.logo span{font-size:22px}.nav button,.playlist button{font-size:0;text-align:center}.nav button:first-letter{font-size:20px}.main{margin-left:70px;width:calc(100% - 70px);padding:15px}.player{grid-template-columns:1fr 1fr}.right{display:none}.now{display:none}.grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 </style>
 </head>
@@ -47,10 +51,11 @@ h1{font-size:28px;margin:18px 0}.sub{color:#aaa}.grid{display:grid;grid-template
     <input id="search" class="search" placeholder="What do you want to play?" onkeydown="if(event.key==='Enter')searchSongs()">
   </div>
   <section id="content">
-    <h1>Good music. No limits.</h1>
-    <p class="sub">Powered by Audius. Search and play available tracks.</p>
-    <h1>Trending</h1>
-    <div id="songs" class="grid"><div class="loader">Loading music…</div></div>
+    <h1>Hindi music</h1>
+    <p class="sub">Pick a singer to explore their tracks.</p>
+    <div id="artists" class="artist-list" aria-label="Hindi singers"></div>
+    <h1 id="songHeading">Hindi songs</h1>
+    <div id="songs" class="grid"><div class="loader">Loading Hindi music…</div></div>
   </section>
 </main>
 </div>
@@ -84,6 +89,7 @@ let activeApiHost=localStorage.getItem("soundify_api_host")||API_HOSTS[0];
 let songs=[], index=-1, queue=[], liked=JSON.parse(localStorage.getItem("liked")||"[]");
 let shuffle=false, repeat=false;
 const audio=document.getElementById("audio"), $=id=>document.getElementById(id);
+const hindiArtists=["Arijit Singh","Kishore Kumar","Lata Mangeshkar","Asha Bhosle","Mohammed Rafi","Sonu Nigam","Shreya Ghoshal","Udit Narayan","Kumar Sanu","Sunidhi Chauhan","Alka Yagnik","Mukesh","Shaan","KK","Jubin Nautiyal","Neha Kakkar","Mohit Chauhan","Atif Aslam","Badshah","Diljit Dosanjh"];
 
 function toast(t){$("toast").textContent=t;$("toast").style.display="block";setTimeout(()=>$ ("toast").style.display="none",2600)}
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
@@ -102,6 +108,23 @@ function render(list,title="Songs"){
     <div class="artist">${esc(s.user?.name||"Unknown artist")}</div>
   </article>`)
  })
+}
+function renderHindiHome(list,title="Hindi songs",selectedArtist=""){
+ songs=list||[];
+ $("content").innerHTML=`<h1>Hindi music</h1><p class="sub">Pick a singer to explore their tracks.</p><div id="artists" class="artist-list" aria-label="Hindi singers"></div><h1 id="songHeading">${esc(title)}</h1><div id="songs" class="grid"></div>`;
+ $("artists").innerHTML=hindiArtists.map(name=>`<button class="artist-chip" aria-pressed="${name===selectedArtist}" onclick="loadArtist('${esc(name)}')">${esc(name)}</button>`).join("");
+ const box=$("songs");
+ if(!songs.length){box.innerHTML='<div class="empty">No songs found. Choose another singer or try Search.</div>';return}
+ songs.forEach((s,i)=>{
+  const isLiked=liked.some(x=>String(x.id)===String(s.id));
+  box.insertAdjacentHTML("beforeend",`<article class="card" onclick="playAt(${i})">
+    <img class="cover" src="${img(s)}" alt="Cover art" onerror="this.style.opacity=.3">
+    <button class="playmini" title="Play ${esc(s.title||"track")}" aria-label="Play ${esc(s.title||"track")}" onclick="event.stopPropagation();playAt(${i})">▶</button>
+    <button class="likemini" title="${isLiked?'Remove from':'Add to'} Liked Songs" onclick="event.stopPropagation();toggleLike(${i})">${isLiked?'♥':'♡'}</button>
+    <div class="title">${esc(s.title||"Untitled")}</div>
+    <div class="artist">${esc(s.user?.name||"Unknown artist")}</div>
+  </article>`)
+ });
 }
 async function api(path){
  const errors=[];
@@ -141,6 +164,18 @@ async function loadTrending(){
  try{render(await api('/tracks/trending?limit=24'),'Trending now')}
  catch(e){showLoadError(e,'Trending now')}
 }
+async function loadHindi(){
+ renderHindiHome([]);
+ $("songs").innerHTML='<div class="loader">Loading Hindi music…</div>';
+ try{renderHindiHome(await api('/tracks/search?query='+encodeURIComponent('Hindi Bollywood')+'&limit=24'))}
+ catch(e){showLoadError(e,'Hindi songs unavailable')}
+}
+async function loadArtist(name){
+ renderHindiHome([],'Songs by '+name,name);
+ $("songs").innerHTML='<div class="loader">Loading '+esc(name)+' tracks…</div>';
+ try{renderHindiHome(await api('/tracks/search?query='+encodeURIComponent(name)+'&limit=24'),'Songs by '+name,name)}
+ catch(e){showLoadError(e,'Could not load '+name)}
+}
 async function searchSongs(){
  const q=$("search").value.trim();if(!q)return;
  $("content").innerHTML='<div class="loader">Searching Audius…</div>';
@@ -164,10 +199,13 @@ function loadCurrent(){
  streamCandidates=[activeApiHost,...API_HOSTS.filter(h=>h!==activeApiHost)];
  streamCandidateIndex=0;
  setStreamSource(s);
- audio.play().catch(()=>toast("Tap Play to start. If it fails, try another track."));
- $("play").textContent="❚❚";toast("Playing: "+(s.title||"Untitled"));
+ audio.play().catch(()=>{ $("play").textContent="▶";toast("Playback was blocked or unavailable. Press Play to retry."); });
 }
-function togglePlay(){if(!audio.src){toast("Select a song first");return}audio.paused?(audio.play(),$("play").textContent="❚❚"):(audio.pause(),$("play").textContent="▶")}
+function togglePlay(){
+ if(!audio.src){toast("Select a song first");return}
+ if(audio.paused)audio.play().catch(()=>{ $("play").textContent="▶";toast("Playback was blocked or unavailable. Try another track."); });
+ else audio.pause();
+}
 function nextSong(){
  if(!queue.length)return;
  if(shuffle) index=Math.floor(Math.random()*queue.length);
@@ -194,7 +232,7 @@ audio.addEventListener("pause",()=>$("play").textContent="▶");
 $("volume").oninput=e=>audio.volume=e.target.value;
 function fmt(x){x=Math.floor(x||0);return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
 function seek(e){if(!audio.duration)return;const r=e.currentTarget.getBoundingClientRect();audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration}
-function home(){loadTrending()}
+function home(){loadHindi()}
 function toggleLike(i){
  const track=songs[i];if(!track)return;
  const id=String(track.id);
@@ -206,7 +244,7 @@ function toggleLike(i){
 }
 function showLiked(){render(liked,"Liked Songs")}
 function showQueue(){render(queue,"Queue")}
-loadTrending();
+loadHindi();
 </script>
 </body>
 </html>
