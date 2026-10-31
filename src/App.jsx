@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  AudiusError, getApiBase, getArtist, getArtwork, getDownloadUrl, getId, getPlaylist, getTrack,
+  AudiusError, getArtist, getArtwork, getDownloadUrl, getId, getPlaylist, getTrack,
   getTrackComments, getTrackRemixes, getTrendingPlaylists, getTrendingTracks,
   getRecentPlaylists, getUser, getUserAlbums, getUserFavorites, getUserFollowers, getUserFollowing,
   getUserPlaylists, getUserReposts, getUserTracks, searchPlaylists, searchTracks, searchUsers,
@@ -52,7 +52,7 @@ function usePageData(loader, dependencies = []) {
       .then((data) => setState({ loading: false, data, error: "" }))
       .catch((error) => {
         if (error.name !== "AbortError") {
-          setState({ loading: false, data: null, error: error.message || "Unable to load Audius content." });
+          setState({ loading: false, data: null, error: getErrorMessage(error) });
         }
       });
     return () => controller.abort();
@@ -135,8 +135,10 @@ function useInfiniteTrendingTracks() {
 }
 
 function getErrorMessage(error) {
-  if (error instanceof AudiusError && error.status === 404) return "This Audius item could not be found.";
-  return error?.message || "Unable to load Audius content. Check your connection and retry.";
+  if (error instanceof AudiusError && error.status === 404) return "This item could not be found.";
+  return String(error?.message || "Unable to load content. Check your connection and retry.")
+    .replace(/https?:\/\/\S+/gi, "the music service")
+    .replace(/audius/gi, "music service");
 }
 
 function usePageMetadata(title, description) {
@@ -190,9 +192,9 @@ function DownloadButton({ track, onMessage, compact = false }) {
     href={getDownloadUrl(track.id)}
     target="_blank"
     rel="noreferrer"
-    aria-label={`Download ${track.title || "track"} from Audius`}
-    title="Download this artist-enabled track from Audius"
-    onClick={() => onMessage?.("Opening the artist-enabled Audius download…")}
+    aria-label={`Download ${track.title || "track"}`}
+    title="Download this artist-enabled track"
+    onClick={() => onMessage?.("Opening track download…")}
   >
     <Download size={compact ? 16 : 17} />{compact ? null : "Download"}
   </a>;
@@ -254,9 +256,9 @@ function AudiusTrackActions({ track, onMessage }) {
     setBusy(true);
     try {
       const isSaved = await toggleAudiusFavorite(track);
-      onMessage(isSaved ? "Saved to your Audius library" : "Removed from your Audius library");
+      onMessage(isSaved ? "Saved to your account library" : "Removed from your account library");
     } catch (error) {
-      onMessage(error.message || "Could not update your Audius favorites.");
+      onMessage(error.message || "Could not update your saved tracks.");
     } finally {
       setBusy(false);
     }
@@ -266,7 +268,7 @@ function AudiusTrackActions({ track, onMessage }) {
     setBusy(true);
     try {
       await repostTrack(track);
-      onMessage("Track reposted to your Audius profile");
+      onMessage("Track shared to your profile");
     } catch (error) {
       onMessage(error.message || "Could not repost this track.");
     } finally {
@@ -274,10 +276,10 @@ function AudiusTrackActions({ track, onMessage }) {
     }
   };
   return <>
-    <button className={`icon-button favorite-button ${saved ? "active" : ""}`} onClick={toggleSaved} disabled={busy || accountLibraryLoading} aria-label={saved ? "Remove Audius favorite" : "Save to Audius"} title={user ? "Save to Audius" : "Sign in to save to Audius"}>
+    <button className={`icon-button favorite-button ${saved ? "active" : ""}`} onClick={toggleSaved} disabled={busy || accountLibraryLoading} aria-label={saved ? "Remove account favorite" : "Save to account"} title={user ? "Save to account" : "Sign in to save"}>
       <Heart size={17} fill={saved ? "currentColor" : "none"} />
     </button>
-    <button className="icon-button" onClick={repost} disabled={busy} aria-label="Repost to Audius" title={user ? "Repost to Audius" : "Sign in to repost"}>
+    <button className="icon-button" onClick={repost} disabled={busy} aria-label="Repost track" title={user ? "Repost track" : "Sign in to repost"}>
       <Repeat2 size={16} />
     </button>
   </>;
@@ -308,10 +310,10 @@ function PlaylistPicker({ track, onMessage }) {
     setAccountBusy(true);
     try {
       const added = await addTrackToAudiusPlaylist(playlist, track);
-      onMessage(added ? `Added to ${playlist.playlist_name || "Audius playlist"}` : "Track is already in that Audius playlist");
+      onMessage(added ? `Added to ${playlist.playlist_name || "playlist"}` : "Track is already in that playlist");
       setOpen(false);
     } catch (error) {
-      onMessage(error.message || "Could not update the Audius playlist.");
+      onMessage(error.message || "Could not update the playlist.");
     } finally {
       setAccountBusy(false);
     }
@@ -322,23 +324,23 @@ function PlaylistPicker({ track, onMessage }) {
       <b>Local playlists</b>
       {playlists.length ? playlists.map((playlist) => <button key={playlist.id} onClick={() => add(playlist)}>{playlist.name}</button>) : <span className="muted">Create a local playlist first.</span>}
       <Link to="/playlists" onClick={() => setOpen(false)}>Manage playlists</Link>
-      <b>Audius playlists</b>
-      {!user && <Link to="/login" onClick={() => setOpen(false)}>Sign in to add to your Audius playlists</Link>}
-      {user && accountLibraryLoading && <span className="muted">Loading your Audius playlists…</span>}
+      <b>Your account playlists</b>
+      {!user && <Link to="/login" onClick={() => setOpen(false)}>Sign in to add to your playlists</Link>}
+      {user && accountLibraryLoading && <span className="muted">Loading your playlists…</span>}
       {user && !accountLibraryLoading && (audiusPlaylists.length
-        ? audiusPlaylists.map((playlist) => <button key={getId(playlist)} onClick={() => addToAudius(playlist)} disabled={accountBusy}>{playlist.playlist_name || "Untitled Audius playlist"}</button>)
-        : <span className="muted">No Audius playlists found.</span>)}
+        ? audiusPlaylists.map((playlist) => <button key={getId(playlist)} onClick={() => addToAudius(playlist)} disabled={accountBusy}>{playlist.playlist_name || "Untitled playlist"}</button>)
+        : <span className="muted">No account playlists found.</span>)}
     </div>}
   </div>;
 }
 
 function TrackGrid({ tracks, onMessage }) {
-  if (!tracks?.length) return <EmptyState title="No tracks here yet" body="Audius did not return any tracks for this section." />;
+  if (!tracks?.length) return <EmptyState title="No tracks here yet" body="No tracks were found for this section." />;
   return <div className="track-grid">{tracks.map((track) => <TrackCard key={track.id} track={track} tracks={tracks} onMessage={onMessage} />)}</div>;
 }
 
 function PlaylistGrid({ playlists }) {
-  if (!playlists?.length) return <EmptyState title="No playlists available" body="Audius did not return any trending playlists." />;
+  if (!playlists?.length) return <EmptyState title="No playlists available" body="No trending playlists were found." />;
   return <div className="profile-grid playlist-grid">{playlists.map((playlist) => (
     <Link className="profile-card playlist-card" to={`/${playlist.is_album ? "albums" : "playlists"}/${encodeURIComponent(getId(playlist))}`} key={getId(playlist)}>
       <Artwork item={playlist} className="profile-art" />
@@ -350,7 +352,7 @@ function PlaylistGrid({ playlists }) {
 }
 
 function AudiusOwnedPlaylistGrid({ playlists, onEdit, onDelete, disabled }) {
-  if (!playlists?.length) return <EmptyState title="No Audius playlists yet" body="Create an Audius playlist above to manage it here." />;
+  if (!playlists?.length) return <EmptyState title="No account playlists yet" body="Create a playlist above to manage it here." />;
   return <div className="profile-grid playlist-grid">{playlists.map((playlist) => (
     <article className="profile-card playlist-card account-playlist-card" key={getId(playlist)}>
       <Link to={`/${playlist.is_album ? "albums" : "playlists"}/${encodeURIComponent(getId(playlist))}`}>
@@ -369,7 +371,7 @@ function ArtistGrid({ artists }) {
   return <div className="profile-grid">{artists.map((artist) => (
     <Link className="profile-card" to={`/artists/${encodeURIComponent(artist.id)}`} key={artist.id}>
       <Artwork item={{ artwork: artist.profile_picture }} className="profile-art artist-grid-art" />
-      <b>{artist.name || artist.handle || "Audius artist"}</b>
+      <b>{artist.name || artist.handle || "Artist"}</b>
       <span>@{artist.handle || "artist"}</span>
       <small>{formatCount(artist.follower_count)} followers</small>
     </Link>
@@ -397,7 +399,7 @@ function HindiSingerCard({ name }) {
         if (match) setProfile(match);
       }).catch((error) => {
         if (error.name !== "AbortError") {
-          console.error(`Unable to find an Audius profile for ${name}.`, error);
+          console.error(`Unable to find an artist profile for ${name}.`, error);
           setFailed(true);
         }
       });
@@ -441,7 +443,7 @@ function RankedTracksSection({ title, eyebrow, tracks, metric, onMessage }) {
 
 function TrackList({ tracks, onMessage, compact = false }) {
   const { playFromQueue, current, isPlaying, togglePlayback, addToQueue, toggleFavorite, favorites } = usePlayer();
-  if (!tracks?.length) return <EmptyState title="No tracks here yet" body="Audius did not return any tracks for this section." />;
+  if (!tracks?.length) return <EmptyState title="No tracks here yet" body="No tracks were found for this section." />;
   return <div className={`list-table ${compact ? "compact" : ""}`}>
     {tracks.map((track, i) => {
       const active = current && String(current.id) === String(track.id);
@@ -474,7 +476,7 @@ function Header({ onMessage, query, setQuery, onSearch }) {
     </div>
     <form className="searchbox" role="search" onSubmit={(event) => { event.preventDefault(); onSearch(query); }}>
       <Search size={19} />
-      <input value={query} onChange={(event) => setQuery(event.target.value)} onFocus={() => { if (!location.pathname.startsWith("/search")) navigate("/search"); }} placeholder="Search tracks, artists, playlists" aria-label="Search Audius" />
+      <input value={query} onChange={(event) => setQuery(event.target.value)} onFocus={() => { if (!location.pathname.startsWith("/search")) navigate("/search"); }} placeholder="Search tracks, artists, playlists" aria-label="Search music" />
       {query && <button className="icon-button search-clear" type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={15} /></button>}
       <kbd>↵</kbd>
     </form>
@@ -502,9 +504,9 @@ function Sidebar({ onMessage }) {
       <NavLink to="/history"><Clock3 size={18} /> Listening history</NavLink>
       <NavLink to="/queue"><ListMusic size={18} /> Queue</NavLink>
       <NavLink to="/playlists"><Disc3 size={18} /> My playlists</NavLink>
-      <NavLink to={user ? "/profile" : "/login"}><UserRound size={18} /> {user ? "Audius profile" : "Sign in"}</NavLink>
+      <NavLink to={user ? "/profile" : "/login"}><UserRound size={18} /> {user ? "My profile" : "Sign in"}</NavLink>
     </nav>
-    <div className="sidebar-note"><div className="note-icon"><Disc3 size={17} /></div><b>Independent sound</b><p>Discover music from artists on Audius.</p><span>Free · Open discovery</span></div>
+    <div className="sidebar-note"><div className="note-icon"><Disc3 size={17} /></div><b>Independent sound</b><p>Discover music from independent artists.</p><span>Free · Open discovery</span></div>
     <NavLink className="settings-link" to="/settings"><Settings size={17} /> Settings <ChevronDown size={14} /></NavLink>
   </aside>;
 }
@@ -596,10 +598,10 @@ function HomePage({ onMessage }) {
   return <div className="page home-page">
     <section className="hero">
       <div className="hero-orb orb-one" /><div className="hero-orb orb-two" />
-      <div className="hero-copy"><span className="eyebrow"><span className="live-dot" /> HINDI MUSIC · AUDIOUS</span><h1>Apna agla<br /><em>favorite gaana.</em></h1><p>Hindi songs discover karein — naye artists aur popular awaazon ke saath.</p><button className="button button-accent" onClick={() => navigate("/search?q=Hindi%20songs&type=tracks")}><Sparkles size={17} /> Hindi gaane explore karein</button></div>
+      <div className="hero-copy"><span className="eyebrow"><span className="live-dot" /> HINDI MUSIC</span><h1>Apna agla<br /><em>favorite gaana.</em></h1><p>Hindi songs discover karein — naye artists aur popular awaazon ke saath.</p><button className="button button-accent" onClick={() => navigate("/search?q=Hindi%20songs&type=tracks")}><Sparkles size={17} /> Hindi gaane explore karein</button></div>
       <div className="hero-art" aria-hidden="true"><div className="hero-record"><div className="record-groove" /><div className="record-label"><AudioLines size={34} /></div></div><div className="hero-sticker">NEW<br />SOUNDS<br /><span>DAILY</span></div></div>
     </section>
-    <div className="section-heading"><div><div className="eyebrow">HINDI SONGS ON AUDIOUS</div><h2>Hindi gaane</h2><p>Audius search results. Scroll karte hi agle tracks load honge.</p></div><Link className="text-link" to="/search?q=Hindi%20songs&type=tracks">Aur gaane dekhein <ArrowRight size={15} /></Link></div>
+    <div className="section-heading"><div><div className="eyebrow">HINDI SONGS</div><h2>Hindi gaane</h2><p>Scroll karte hi agle tracks load honge.</p></div><Link className="text-link" to="/search?q=Hindi%20songs&type=tracks">Aur gaane dekhein <ArrowRight size={15} /></Link></div>
     {loading && <LoadingGrid />}
     {!loading && error && !tracks.length && <ErrorState message={error} onRetry={retry} />}
     {!loading && tracks.length > 0 && <TrackGrid tracks={tracks} onMessage={onMessage} />}
@@ -607,9 +609,9 @@ function HomePage({ onMessage }) {
     <div className="infinite-scroll-sentinel" ref={sentinelRef} aria-hidden="true" />
     {loadingMore && <div className="inline-loading"><LoaderCircle className="spin" size={18} /> Loading more tracks…</div>}
     {!loadingMore && hasMore && tracks.length > 0 && <button className="button button-muted load-more" onClick={loadMore}>Load more tracks</button>}
-    {!hasMore && tracks.length > 0 && <p className="source-note">Audius par abhi ke Hindi song search results yahan tak the.</p>}
+    {!hasMore && tracks.length > 0 && <p className="source-note">Abhi ke Hindi song results yahan tak the.</p>}
     <section className="discovery-section hindi-singers-section">
-      <div className="section-heading"><div><div className="eyebrow">HINDI PLAYBACK SINGERS</div><h2>Apne pasandida singer ko chunein</h2><p>50 singer names browse karein. Click karke unke Audius songs ya artist profile kholen.</p></div></div>
+      <div className="section-heading"><div><div className="eyebrow">HINDI PLAYBACK SINGERS</div><h2>Apne pasandida singer ko chunein</h2><p>50 singer names browse karein. Click karke unke gaane ya artist profile kholen.</p></div></div>
       <HindiSingerGrid />
     </section>
     {listeningPreferences.genres.length > 0 && <section className="discovery-section">
@@ -625,13 +627,13 @@ function HomePage({ onMessage }) {
       <PlaylistGrid playlists={listeningPreferences.playlists} />
     </section>}
     <section className="discovery-section">
-      <div className="section-heading"><div><div className="eyebrow">COMMUNITY PICKS</div><h2>Trending playlists</h2><p>Public playlists currently popular on Audius.</p></div></div>
+      <div className="section-heading"><div><div className="eyebrow">COMMUNITY PICKS</div><h2>Trending playlists</h2><p>Popular public playlists.</p></div></div>
       {playlistsLoading && <LoadingGrid />}
       {!playlistsLoading && playlistsError && <ErrorState message={playlistsError} onRetry={retryPlaylists} />}
       {!playlistsLoading && !playlistsError && <PlaylistGrid playlists={playlists || []} />}
     </section>
     <section className="discovery-section">
-      <div className="section-heading"><div><div className="eyebrow">RECENTLY CREATED</div><h2>New playlists</h2><p>Recent public Audius playlists.</p></div></div>
+      <div className="section-heading"><div><div className="eyebrow">RECENTLY CREATED</div><h2>New playlists</h2><p>Recently created public playlists.</p></div></div>
       {newPlaylistsLoading && <LoadingGrid />}
       {!newPlaylistsLoading && newPlaylistsError && <ErrorState message={newPlaylistsError} onRetry={retryNewPlaylists} />}
       {!newPlaylistsLoading && !newPlaylistsError && <PlaylistGrid playlists={newPlaylists || []} />}
@@ -651,11 +653,11 @@ function HomePage({ onMessage }) {
       <Link to="/for-you" className="button button-accent">For you <ArrowRight size={15} /></Link>
     </section>
     <section className="genre-section">
-      <div className="section-heading"><div><div className="eyebrow">FOLLOW A FEELING</div><h2>Explore by sound</h2><p>Search Audius tracks by a style you love.</p></div></div>
+      <div className="section-heading"><div><div className="eyebrow">FOLLOW A FEELING</div><h2>Explore by sound</h2><p>Search tracks by a style you love.</p></div></div>
       <div className="genre-grid">{genres.map((genre, i) => <button className={`genre-tile genre-${i % 5}`} key={genre} onClick={() => navigate(`/genres/${encodeURIComponent(genre)}`)}><span>{genre}</span><ArrowRight size={17} /></button>)}</div>
       <div className="mood-chips"><span className="eyebrow">SEARCH BY MOOD PHRASE</span>{["Chill", "Energetic", "Focus", "Dreamy", "Party", "Melancholy"].map((mood) => <Link key={mood} to={`/moods/${encodeURIComponent(mood)}`}>{mood}</Link>)}</div>
     </section>
-    <p className="source-note">Music, metadata, and artwork are supplied by Audius. Availability and playback depend on the source track.</p>
+    <p className="source-note">Music availability and playback depend on the track.</p>
   </div>;
 }
 
@@ -673,10 +675,10 @@ function DiscoverPage({ onMessage }) {
     if (!tracks?.length) return;
     const randomIndex = Math.floor(Math.random() * tracks.length);
     playFromQueue(tracks, randomIndex);
-    onMessage("Playing a random track from Audius trending");
+    onMessage("Playing a random trending track");
   };
   return <div className="page">
-    <PageIntro eyebrow="DISCOVERY" title="Explore the soundscape" description="Browse real tracks currently trending on Audius." />
+    <PageIntro eyebrow="DISCOVERY" title="Explore the soundscape" description="Browse tracks that are currently trending." />
     <div className="discovery-controls">
       <label><SlidersHorizontal size={16} /><span>Filter charts</span></label>
       <select value={genre} onChange={(event) => setGenre(event.target.value)} aria-label="Filter by genre">
@@ -690,7 +692,7 @@ function DiscoverPage({ onMessage }) {
     {loading && <LoadingGrid />}
     {!loading && error && <ErrorState message={error} onRetry={retry} />}
     {!loading && !error && <TrackList tracks={tracks || []} onMessage={onMessage} />}
-    <p className="source-note">Charts are public Audius results filtered by the selected genre and time period. Mood/tag filtering, “under the radar,” and proprietary personalized recommendations are not exposed by this public endpoint. “Feeling lucky” plays a random result from the loaded chart.</p>
+    <p className="source-note">Charts are filtered by the selected genre and time period. “Feeling lucky” plays a random result from the loaded chart.</p>
   </div>;
 }
 
@@ -701,11 +703,11 @@ function NewReleasesPage({ onMessage }) {
   );
   const latest = [...(chart || [])].sort((a, b) =>
     new Date(b.release_date || b.created_at || 0) - new Date(a.release_date || a.created_at || 0));
-  return <div className="page"><PageIntro eyebrow="LATEST RELEASE DATES" title="New releases" description="Recently dated tracks from Audius’s weekly trending chart." />
+  return <div className="page">  <PageIntro eyebrow="LATEST RELEASE DATES" title="New releases" description="Recently released tracks from the trending chart." />
     {loading && <LoadingGrid />}
     {!loading && error && <ErrorState message={error} onRetry={retry} />}
     {!loading && !error && <TrackGrid tracks={latest} onMessage={onMessage} />}
-    <p className="source-note">The public discovery API does not expose a complete global new-release catalog here; this list sorts the weekly trending results by the release dates Audius returns.</p>
+    <p className="source-note">This list sorts currently trending tracks by their release dates.</p>
   </div>;
 }
 
@@ -715,11 +717,11 @@ function MoodPage({ onMessage }) {
     (signal) => searchTracks(mood, signal),
     [mood],
   );
-  return <div className="page"><PageIntro eyebrow="SEARCH BY MOOD" title={mood} description="Tracks returned by Audius search for this mood/tag phrase." />
+  return <div className="page"><PageIntro eyebrow="SEARCH BY MOOD" title={mood} description={`Tracks matching “${mood}” in their titles, tags, or descriptions.`} />
     {loading && <LoadingGrid />}
     {!loading && error && <ErrorState message={error} onRetry={retry} />}
     {!loading && !error && <TrackList tracks={tracks || []} onMessage={onMessage} />}
-    <p className="source-note">Audius has no public canonical mood directory; this page searches real track metadata and descriptions by the selected phrase.</p>
+    <p className="source-note">Results are based on matching track titles, tags, and descriptions.</p>
   </div>;
 }
 
@@ -747,11 +749,11 @@ function ForYouPage({ onMessage }) {
     .slice(0, 18)
     .map(({ track }) => track);
   return <div className="page">
-    <PageIntro eyebrow="LOCAL, NOT PROPRIETARY" title="Made for your listening" description={listened.length ? "A lightweight recommendation ranking from your local favorites/history and real Audius chart metadata." : "Save or play tracks to personalize this local section. Until then, these are public trending tracks—not personalized recommendations."} />
+    <PageIntro eyebrow="LOCAL RECOMMENDATIONS" title="Made for your listening" description={listened.length ? "Recommendations based on your locally saved favorites, history, and track details." : "Save or play tracks to personalize this section. Until then, these are trending tracks."} />
     {loading && <LoadingGrid />}
     {!loading && error && <ErrorState message={error} onRetry={retry} />}
     {!loading && !error && <TrackGrid tracks={recommendations.length ? recommendations : chart || []} onMessage={onMessage} />}
-    <p className="source-note">This local ranking compares genre/tag metadata against this browser’s favorites and listening history. It is not Audius’s recommendation engine, does not send your history to Audius, and uses the public trending chart as its candidate pool.</p>
+    <p className="source-note">Your favorites and listening history stay in this browser and are not used to identify you.</p>
   </div>;
 }
 
@@ -760,24 +762,24 @@ function PageIntro({ eyebrow, title, description, children }) {
 }
 
 function UnavailableFeaturePage({ title, feature, details }) {
-  return <div className="page"><PageIntro eyebrow="AUDIOUS API LIMITATION" title={title} description={details} />
-    <div className="notice-box unavailable-notice"><CircleHelp size={18} /><span><b>{feature} isn’t available in this app.</b> This feature needs an authenticated Audius operation or a public endpoint that is not available here. No simulated data or actions are shown.</span></div>
-    <Link className="button button-muted" to="/discover"><Sparkles size={16} /> Return to public discovery</Link>
+  return <div className="page"><PageIntro eyebrow="FEATURE INFORMATION" title={title} description={details} />
+    <div className="notice-box unavailable-notice"><CircleHelp size={18} /><span><b>{feature} isn’t available in this app.</b> No simulated data or actions are shown.</span></div>
+    <Link className="button button-muted" to="/discover"><Sparkles size={16} /> Explore music</Link>
   </div>;
 }
 
 function AudiusLoginPage() {
   const { user, status, error, configured, login, logout, clearAuthError } = useAuth();
-  usePageMetadata("Audius sign-in", "Sign in securely with Audius to save tracks, follow artists, repost, and comment.");
-  if (user) return <div className="page"><PageIntro eyebrow="AUDIOUS ACCOUNT" title={`Welcome, ${user.name || user.handle || "listener"}`} description="Your Audius account is connected to Soungdify." />
-    <div className="settings-card"><p>Signed in as <b>@{user.handle || user.name}</b>. Your account actions are authorized directly by Audius.</p><div className="settings-actions"><Link className="button button-accent" to="/profile">Open your profile</Link><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div></div>
+  usePageMetadata("Sign in", "Sign in securely to save tracks, follow artists, repost, and comment.");
+  if (user) return <div className="page"><PageIntro eyebrow="YOUR ACCOUNT" title={`Welcome, ${user.name || user.handle || "listener"}`} description="Your account is connected to Soungdify." />
+    <div className="settings-card"><p>Signed in as <b>@{user.handle || user.name}</b>.</p><div className="settings-actions"><Link className="button button-accent" to="/profile">Open your profile</Link><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div></div>
   </div>;
-  return <div className="page"><PageIntro eyebrow="AUDIOUS ACCOUNT" title="Sign in with Audius" description="Connect your Audius account to save favorites, follow artists, repost tracks, and comment." />
+  return <div className="page"><PageIntro eyebrow="YOUR ACCOUNT" title="Sign in" description="Connect your account to save favorites, follow artists, repost tracks, and comment." />
     <section className="settings-card account-login-card">
-      {!configured && <div className="notice-box"><CircleHelp size={17} /><span>Sign-in setup is required. Add a public Audius API key and register this exact callback URL: <code>{window.location.origin}/callback</code>.</span></div>}
+      {!configured && <div className="notice-box"><CircleHelp size={17} /><span>Sign-in setup is required. Contact the app administrator to enable account sign-in.</span></div>}
       {error && <p className="auth-error" role="alert">{error}</p>}
-      <button className="button button-accent" onClick={login} disabled={!configured || status === "loading"}><LogIn size={17} /> {status === "loading" ? "Checking session…" : "Continue with Audius"}</button>
-      <p className="muted">Soungdify never asks for or stores your Audius password. Audius authorizes the connection using OAuth with PKCE.</p>
+      <button className="button button-accent" onClick={login} disabled={!configured || status === "loading"}><LogIn size={17} /> {status === "loading" ? "Checking session…" : "Continue"}</button>
+      <p className="muted">Soungdify never asks for or stores your account password.</p>
       {error && <button className="text-link button-reset" onClick={clearAuthError}>Dismiss message</button>}
     </section>
   </div>;
@@ -787,10 +789,10 @@ function AudiusCallbackPage() {
   const { status, error } = useAuth();
   return <div className="page">
     {status === "loading"
-      ? <div className="inline-loading"><LoaderCircle className="spin" /> Completing secure Audius sign-in…</div>
+      ? <div className="inline-loading"><LoaderCircle className="spin" /> Completing secure sign-in…</div>
       : error
         ? <ErrorState message={error} onRetry={() => window.location.assign("/login")} />
-        : <EmptyState title="No sign-in response found" body="Return to the sign-in page to connect your Audius account." action={<Link className="text-link" to="/login">Go to sign in</Link>} />}
+        : <EmptyState title="No sign-in response found" body="Return to the sign-in page to connect your account." action={<Link className="text-link" to="/login">Go to sign in</Link>} />}
   </div>;
 }
 
@@ -813,9 +815,9 @@ function AudiusAccountPage({ initialTab = "favorites", onMessage }) {
     if (tab === "reposts") return getUserReposts(user.userId, signal);
     return getUserTracks(user.userId, signal);
   }, [user?.userId, tab]);
-  usePageMetadata(user?.name || "Your Audius profile", "Your Audius profile and account library.");
-  if (!user && status === "loading") return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Checking your Audius session…</div></div>;
-  if (!user) return <div className="page"><PageIntro eyebrow="AUDIOUS ACCOUNT" title="Your profile" description="Sign in with Audius to view your account library." />{authError && <p className="auth-error" role="alert">{authError}</p>}<Link className="button button-accent" to="/login">Sign in with Audius</Link></div>;
+  usePageMetadata(user?.name || "Your profile", "Your profile and account library.");
+  if (!user && status === "loading") return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Checking your session…</div></div>;
+  if (!user) return <div className="page"><PageIntro eyebrow="YOUR ACCOUNT" title="Your profile" description="Sign in to view your account library." />{authError && <p className="auth-error" role="alert">{authError}</p>}<Link className="button button-accent" to="/login">Sign in</Link></div>;
   const tabs = ["favorites", "reposts", "tracks", "playlists", "followers", "following"];
   const entries = Array.isArray(content.data) ? content.data : [];
   const tracks = entries.map((entry) => entry.track || entry).filter((entry) => entry?.title);
@@ -827,9 +829,9 @@ function AudiusAccountPage({ initialTab = "favorites", onMessage }) {
       await createAudiusPlaylist(playlistName, playlistDescription);
       setPlaylistName("");
       setPlaylistDescription("");
-      onMessage("Audius playlist created");
+      onMessage("Playlist created");
     } catch (playlistError) {
-      onMessage(playlistError.message || "Could not create the Audius playlist.");
+      onMessage(playlistError.message || "Could not create the playlist.");
     } finally {
       setPlaylistBusy(false);
     }
@@ -842,38 +844,38 @@ function AudiusAccountPage({ initialTab = "favorites", onMessage }) {
     setPlaylistBusy(true);
     try {
       await updateAudiusPlaylist(playlist, { playlist_name: name.trim(), description: description.trim() });
-      onMessage("Audius playlist updated");
+      onMessage("Playlist updated");
     } catch (playlistError) {
-      onMessage(playlistError.message || "Could not update the Audius playlist.");
+      onMessage(playlistError.message || "Could not update the playlist.");
     } finally {
       setPlaylistBusy(false);
     }
   };
   const removePlaylist = async (playlist) => {
-    if (!window.confirm(`Delete "${playlist.playlist_name || "this playlist"}" from Audius?`)) return;
+    if (!window.confirm(`Delete "${playlist.playlist_name || "this playlist"}" from your account?`)) return;
     setPlaylistBusy(true);
     try {
       await deleteAudiusPlaylist(playlist);
-      onMessage("Audius playlist deleted");
+      onMessage("Playlist deleted");
     } catch (playlistError) {
-      onMessage(playlistError.message || "Could not delete the Audius playlist.");
+      onMessage(playlistError.message || "Could not delete the playlist.");
     } finally {
       setPlaylistBusy(false);
     }
   };
   return <div className="page">
-    <div className="artist-hero"><div className="artist-profile"><Artwork item={{ artwork: user.profilePicture }} className="artist-avatar" /><div><span className="eyebrow">YOUR AUDIOUS ACCOUNT</span><h1>{user.name || user.handle}</h1><p>@{user.handle}</p></div><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div></div>
+    <div className="artist-hero"><div className="artist-profile"><Artwork item={{ artwork: user.profilePicture }} className="artist-avatar" /><div><span className="eyebrow">YOUR ACCOUNT</span><h1>{user.name || user.handle}</h1><p>@{user.handle}</p></div><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div></div>
     {authError && <p className="auth-error" role="alert">{authError}</p>}
-    <div className="search-tabs profile-tabs" role="tablist" aria-label="Your Audius library">{tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "selected" : ""} onClick={() => setTab(item)}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div>
-    {content.loading && <div className="inline-loading"><LoaderCircle className="spin" /> Loading your Audius {tab}…</div>}
+    <div className="search-tabs profile-tabs" role="tablist" aria-label="Your account library">{tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "selected" : ""} onClick={() => setTab(item)}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div>
+    {content.loading && <div className="inline-loading"><LoaderCircle className="spin" /> Loading your {tab}…</div>}
     {!content.loading && content.error && <ErrorState message={content.error} onRetry={content.retry} />}
     {!content.loading && !content.error && ["favorites", "tracks", "reposts"].includes(tab) && <TrackList tracks={tracks} onMessage={onMessage} />}
     {!content.loading && !content.error && tab === "playlists" && <>
-      <form className="account-playlist-form settings-card" onSubmit={createPlaylist}><h2>Create an Audius playlist</h2><label>Playlist name<input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} maxLength={100} required /></label><label>Description<input value={playlistDescription} onChange={(event) => setPlaylistDescription(event.target.value)} maxLength={1000} /></label><button className="button button-accent" disabled={playlistBusy || !playlistName.trim()}><Plus size={16} /> Create playlist</button></form>
+      <form className="account-playlist-form settings-card" onSubmit={createPlaylist}><h2>Create a playlist</h2><label>Playlist name<input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} maxLength={100} required /></label><label>Description<input value={playlistDescription} onChange={(event) => setPlaylistDescription(event.target.value)} maxLength={1000} /></label><button className="button button-accent" disabled={playlistBusy || !playlistName.trim()}><Plus size={16} /> Create playlist</button></form>
       <AudiusOwnedPlaylistGrid playlists={audiusPlaylists.length ? audiusPlaylists : entries} onEdit={editPlaylist} onDelete={removePlaylist} disabled={playlistBusy} />
     </>}
     {!content.loading && !content.error && ["followers", "following"].includes(tab) && <UserGrid users={entries} />}
-    {tab === "favorites" && <p className="source-note">{audiusFavorites.length} Audius favorites loaded for quick-save controls.</p>}
+    {tab === "favorites" && <p className="source-note">{audiusFavorites.length} favorites loaded for quick-save controls.</p>}
   </div>;
 }
 
@@ -992,14 +994,14 @@ function SearchPage({ onMessage, query, setQuery }) {
     search(term);
     setTab("all");
   };
-  const showProfiles = (items) => <div className="profile-grid">{items.map((user) => <Link className="profile-card" to={`/artists/${encodeURIComponent(user.id)}`} key={user.id}><Artwork item={{ artwork: user?.profile_picture }} className="profile-art artist-grid-art" /><b>{user.name || user.handle || "Audius artist"}</b><span>@{user.handle || "artist"}</span><small>{formatCount(user.follower_count)} followers</small></Link>)}</div>;
+  const showProfiles = (items) => <div className="profile-grid">{items.map((user) => <Link className="profile-card" to={`/artists/${encodeURIComponent(user.id)}`} key={user.id}><Artwork item={{ artwork: user?.profile_picture }} className="profile-art artist-grid-art" /><b>{user.name || user.handle || "Artist"}</b><span>@{user.handle || "artist"}</span><small>{formatCount(user.follower_count)} followers</small></Link>)}</div>;
   const showPlaylists = (items) => <PlaylistGrid playlists={items} />;
   return <div className="page search-page">
-    <PageIntro eyebrow="SEARCH AUDIOUS" title="What are you in the mood for?" description="Search public Audius tracks, artists, and playlists." />
+    <PageIntro eyebrow="MUSIC SEARCH" title="What are you in the mood for?" description="Search tracks, artists, and playlists." />
     <form className="search-page-form" onSubmit={(event) => { event.preventDefault(); submitSearch(query); }}><Search size={20} /><input value={query} onChange={(event) => { setOffset(0); setQuery(event.target.value); }} placeholder="Try a track, artist, or genre" autoFocus aria-label="Search query" /><button className="button button-accent" type="submit">Search</button></form>
     {query.trim().length < 2 && <div className="recent-searches"><div className="section-heading small-heading"><div><h2>Recent searches</h2></div>{recent.length > 0 && <button className="text-link button-reset" onClick={() => { if (writeLocal("soungdify.searches", [])) setRecent([]); else onMessage("Could not clear search history from browser storage."); }}>Clear history</button>}</div>{recent.length ? <div className="recent-chips">{recent.map((term) => <button key={term} onClick={() => submitSearch(term)}><Clock3 size={14} />{term}</button>)}</div> : <p className="muted">Your searches stay on this device.</p>}</div>}
     {query.trim().length >= 2 && <><div className="search-tabs" role="tablist" aria-label="Search result type">{tabs.map((item) => <button role="tab" aria-selected={tab === item} className={tab === item ? "selected" : ""} key={item} onClick={() => { setOffset(0); setTab(item); }}>{item === "artists" ? "Artists / users" : item[0].toUpperCase() + item.slice(1)}</button>)}</div>
-      {loading && <div className="inline-loading"><LoaderCircle className="spin" size={20} /> Searching Audius…</div>}
+      {loading && <div className="inline-loading"><LoaderCircle className="spin" size={20} /> Searching…</div>}
       {!loading && error && <ErrorState message={error} onRetry={() => setRetryCount((value) => value + 1)} />}
       {!loading && !error && tab === "all" && !results.tracks?.length && !results.artists?.length && !results.playlists?.length && <EmptyState title="No results found" body={`Nothing matched “${query}”. Try a different search.`} />}
       {!loading && !error && tab === "all" && results.tracks?.length > 0 && <section className="search-preview"><div className="section-heading small-heading"><div><h2>Tracks</h2></div><button className="text-link button-reset" onClick={() => setTab("tracks")}>See all</button></div><TrackList tracks={results.tracks} onMessage={onMessage} /></section>}
@@ -1009,7 +1011,7 @@ function SearchPage({ onMessage, query, setQuery }) {
       {!loading && !error && tab === "artists" && results.length > 0 && showProfiles(results)}
       {!loading && !error && tab === "playlists" && results.length > 0 && showPlaylists(results)}
       {!loading && !error && tab === "albums" && results.length > 0 && <PlaylistGrid playlists={results} />}
-      {!loading && !error && tab === "tags" && <div className="tag-search-results"><p className="muted">Audius does not have a public tag catalog/search endpoint. Matching tracks are shown from track search; genre filters are available on Discover.</p>{(Array.isArray(results) ? results : []).filter((item) => (item.tags || "").toLowerCase().includes(query.toLowerCase())).length
+      {!loading && !error && tab === "tags" && <div className="tag-search-results"><p className="muted">Matching tracks are shown from search; genre filters are available on Discover.</p>{(Array.isArray(results) ? results : []).filter((item) => (item.tags || "").toLowerCase().includes(query.toLowerCase())).length
         ? <TrackList tracks={(Array.isArray(results) ? results : []).filter((item) => (item.tags || "").toLowerCase().includes(query.toLowerCase()))} onMessage={onMessage} />
         : <EmptyState title="No matching track tags" body="Try a related keyword or search tracks directly." />}</div>}
       {!loading && !error && !["all", "tracks", "artists", "playlists", "albums", "tags"].includes(tab) && null}
@@ -1043,7 +1045,7 @@ function LibraryPage({ onMessage }) {
   return <div className="page">
     <PageIntro eyebrow="YOUR LIBRARY" title="Your music, your way" description="Favorites and listening history are stored locally on this device." />
     <div className="search-tabs library-tabs" role="tablist" aria-label="Library section"><button role="tab" aria-selected={tab === "saved"} className={tab === "saved" ? "selected" : ""} onClick={() => setTab("saved")}>Saved tracks <span>{favorites.length}</span></button><button role="tab" aria-selected={tab === "history"} className={tab === "history" ? "selected" : ""} onClick={() => setTab("history")}>Recently played <span>{history.length}</span></button></div>
-    {unique.length ? <TrackList tracks={unique} compact onMessage={onMessage} /> : <EmptyState title={tab === "saved" ? "Your library starts here" : "No listening history yet"} body={tab === "saved" ? "Save tracks with the heart button. Favorites are local and are not synced to Audius." : "Play something from discovery and it will appear here."} />}
+    {unique.length ? <TrackList tracks={unique} compact onMessage={onMessage} /> : <EmptyState title={tab === "saved" ? "Your library starts here" : "No listening history yet"} body={tab === "saved" ? "Save tracks with the heart button. Favorites are stored on this device." : "Play something from discovery and it will appear here."} />}
   </div>;
 }
 
@@ -1074,7 +1076,7 @@ function LocalPlaylistsPage({ onMessage }) {
     else onMessage("Could not delete the playlist from browser storage.");
   };
   return <div className="page">
-    <PageIntro eyebrow="YOUR DEVICE" title="My playlists" description="Create and manage playlists stored in this browser. These are private and are not uploaded to Audius." />
+    <PageIntro eyebrow="YOUR DEVICE" title="My playlists" description="Create and manage playlists stored privately in this browser." />
     <form className="playlist-create-form" onSubmit={create}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Playlist name" aria-label="Playlist name" maxLength={80} required /><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description (optional)" aria-label="Playlist description" maxLength={240} /><button className="button button-accent" type="submit"><Plus size={16} /> Create playlist</button></form>
     {playlists.length ? <div className="profile-grid local-playlists">{playlists.map((playlist) => <article className="profile-card" key={playlist.id}>
       <Link to={`/my-playlists/${encodeURIComponent(playlist.id)}`} className="local-playlist-link"><div className="artwork artwork-fallback profile-art"><ListMusic size={28} /></div><b>{playlist.name}</b><span>{playlist.description || "Local playlist"}</span><small>{playlist.tracks.length} tracks</small></Link>
@@ -1122,7 +1124,7 @@ function LocalPlaylistPage({ onMessage }) {
     <div className="playlist-hero local-hero"><div className="artwork artwork-fallback detail-art"><ListMusic size={54} /></div><div><span className="eyebrow">LOCAL PLAYLIST</span><h1>{playlist.name}</h1><p>{playlist.description || "Stored only in this browser"} · {playlist.tracks.length} tracks</p><div className="detail-actions"><button className="button button-accent" disabled={!playlist.tracks.length} onClick={() => playFromQueue(playlist.tracks)}><Play size={16} fill="currentColor" /> Play playlist</button><button className="button button-muted" disabled={!playlist.tracks.length} onClick={() => playFromQueue([...playlist.tracks].sort(() => Math.random() - 0.5))}><Shuffle size={16} /> Shuffle</button></div></div></div>
     <form className="playlist-create-form edit-playlist-form" onSubmit={updatePlaylist}><input value={name} onChange={(event) => setName(event.target.value)} aria-label="Edit playlist name" maxLength={80} required /><input value={description} onChange={(event) => setDescription(event.target.value)} aria-label="Edit playlist description" placeholder="Description (optional)" maxLength={240} /><button className="button button-muted" type="submit">Save details</button></form>
     {playlist.tracks.length ? <div className="list-table">{playlist.tracks.map((track, i) => <div className="list-row local-track-row" key={track.id}><button className="list-play" onClick={() => playFromQueue(playlist.tracks, i)} aria-label={`Play ${track.title}`}><Play size={15} /></button><Artwork item={track} className="list-art" /><div className="list-track-label"><Link to={`/tracks/${encodeURIComponent(track.id)}`}>{track.title || "Untitled track"}</Link><Link className="muted-link" to={`/artists/${encodeURIComponent(track.user?.id || "")}`}>{getArtist(track)}</Link></div><div className="local-track-actions"><button className="icon-button" onClick={() => moveTrack(i, i - 1)} aria-label="Move track up"><ArrowUp size={14} /></button><button className="icon-button" onClick={() => moveTrack(i, i + 1)} aria-label="Move track down"><ArrowDown size={14} /></button><button className="icon-button" onClick={() => remove(track.id)} aria-label="Remove track from local playlist"><X size={17} /></button></div></div>)}</div> : <EmptyState title="This playlist is empty" body="Use the playlist button next to any track to add it here." />}
-    <p className="source-note">This playlist is local only; it is not an Audius playlist.</p>
+    <p className="source-note">This playlist is stored only in this browser.</p>
   </div>;
 }
 
@@ -1133,7 +1135,7 @@ function HistoryPage({ onMessage }) {
   return <div className="page"><PageIntro eyebrow="ON THIS DEVICE" title="Listening history" description="Recent plays, play duration, and completion status are private and stored only in this browser.">
     {history.length > 0 && <button className="button button-muted" onClick={() => { clearHistory(); onMessage("Listening history cleared"); }}>Clear history</button>}
   </PageIntro>
-    {history.length ? <div className="list-table history-table">{history.map((entry) => <div className="list-row" key={`${entry.track.id}-${entry.playedAt}`}><button className="list-play" onClick={() => playTrack(entry.track)} aria-label={`Play ${entry.track.title}`}><Play size={15} /></button><Artwork item={entry.track} className="list-art" /><div className="list-track-label"><Link to={`/tracks/${encodeURIComponent(entry.track.id)}`}>{entry.track.title || "Untitled track"}</Link><span>{getArtist(entry.track)} · Played {new Date(entry.playedAt).toLocaleString()}</span></div><span className="history-play-meta">{formatTime(entry.playedDuration || 0)} {entry.completed ? "· Finished" : ""}</span></div>)}</div> : <EmptyState title="Nothing played yet" body="Explore Audius to start building a listening history." />}
+    {history.length ? <div className="list-table history-table">{history.map((entry) => <div className="list-row" key={`${entry.track.id}-${entry.playedAt}`}><button className="list-play" onClick={() => playTrack(entry.track)} aria-label={`Play ${entry.track.title}`}><Play size={15} /></button><Artwork item={entry.track} className="list-art" /><div className="list-track-label"><Link to={`/tracks/${encodeURIComponent(entry.track.id)}`}>{entry.track.title || "Untitled track"}</Link><span>{getArtist(entry.track)} · Played {new Date(entry.playedAt).toLocaleString()}</span></div><span className="history-play-meta">{formatTime(entry.playedDuration || 0)} {entry.completed ? "· Finished" : ""}</span></div>)}</div> : <EmptyState title="Nothing played yet" body="Explore music to start building a listening history." />}
   </div>;
 }
 
@@ -1166,17 +1168,17 @@ function TrackPage({ onMessage }) {
   const { playTrack, addToQueue, toggleFavorite, favorites } = usePlayer();
   const { user } = useAuth();
   usePageMetadata(track?.title, track?.description || `Listen to ${track?.title || "this track"} by ${getArtist(track)} on Soungdify.`);
-  if (loading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading Audius track…</div></div>;
+  if (loading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading track…</div></div>;
   if (error || !track) return <div className="page"><ErrorState message={error || "Track not found."} onRetry={retry} /></div>;
   const liked = favorites.some((item) => String(item.id) === String(track.id));
   return <div className="page detail-page">
-    <div className="track-hero"><Artwork item={track} className="detail-art" /><div><span className="eyebrow">AUDIOUS TRACK</span><h1>{track.title || "Untitled track"}</h1><Link to={`/artists/${encodeURIComponent(track.user?.id || track.user_id || "")}`} className="detail-artist">{getArtist(track)}</Link><p className="detail-tags">{[track.genre, track.mood, ...(typeof track.tags === "string" ? track.tags.split(",").filter(Boolean).slice(0, 4) : [])].filter(Boolean).join(" · ") || "Independent music"}</p><div className="detail-stats"><span><Play size={14} /> {formatCount(track.play_count)} plays</span><span><Heart size={14} /> {formatCount(track.favorite_count)} Audius favorites</span><span><Repeat size={14} /> {formatCount(track.repost_count)} reposts</span><span>{formatTime(track.duration || 0)}</span>{track.release_date && <span>{new Date(track.release_date).toLocaleDateString()}</span>}</div><div className="detail-actions"><button className="button button-accent" onClick={() => playTrack(track)}><Play size={16} fill="currentColor" /> Play track</button><button className="button button-muted" onClick={() => onMessage(addToQueue(track) ? "Added to queue" : "Track is already in the queue")}><Plus size={17} /> Add to queue</button><button className="button button-muted" onClick={() => toggleFavorite(track)}><Heart size={16} fill={liked ? "currentColor" : "none"} /> {liked ? "Saved locally" : "Save locally"}</button><DownloadButton track={track} onMessage={onMessage} /><AudiusTrackActions track={track} onMessage={onMessage} /><PlaylistPicker track={track} onMessage={onMessage} /></div>
+    <div className="track-hero"><Artwork item={track} className="detail-art" /><div><span className="eyebrow">TRACK</span><h1>{track.title || "Untitled track"}</h1><Link to={`/artists/${encodeURIComponent(track.user?.id || track.user_id || "")}`} className="detail-artist">{getArtist(track)}</Link><p className="detail-tags">{[track.genre, track.mood, ...(typeof track.tags === "string" ? track.tags.split(",").filter(Boolean).slice(0, 4) : [])].filter(Boolean).join(" · ") || "Independent music"}</p><div className="detail-stats"><span><Play size={14} /> {formatCount(track.play_count)} plays</span><span><Heart size={14} /> {formatCount(track.favorite_count)} favorites</span><span><Repeat size={14} /> {formatCount(track.repost_count)} reposts</span><span>{formatTime(track.duration || 0)}</span>{track.release_date && <span>{new Date(track.release_date).toLocaleDateString()}</span>}</div><div className="detail-actions"><button className="button button-accent" onClick={() => playTrack(track)}><Play size={16} fill="currentColor" /> Play track</button><button className="button button-muted" onClick={() => onMessage(addToQueue(track) ? "Added to queue" : "Track is already in the queue")}><Plus size={17} /> Add to queue</button><button className="button button-muted" onClick={() => toggleFavorite(track)}><Heart size={16} fill={liked ? "currentColor" : "none"} /> {liked ? "Saved locally" : "Save locally"}</button><DownloadButton track={track} onMessage={onMessage} /><AudiusTrackActions track={track} onMessage={onMessage} /><PlaylistPicker track={track} onMessage={onMessage} /></div>
       {track.playlist_id && <Link className="text-link detail-album-link" to={`/albums/${encodeURIComponent(track.playlist_id)}`}><Disc3 size={15} /> Open release</Link>}
     </div></div>
     {track.description && <section className="detail-description"><h2>About this track</h2><p>{track.description}</p></section>}
-    <section className="track-related"><div className="section-heading"><div><div className="eyebrow">RELATED AUDIO</div><h2>Remixes</h2><p>Remixes listed by Audius for this track.</p></div></div>{remixesLoading ? <div className="inline-loading"><LoaderCircle className="spin" /> Loading remixes…</div> : <TrackList tracks={remixes || []} onMessage={onMessage} />}</section>
+    <section className="track-related"><div className="section-heading"><div><div className="eyebrow">RELATED AUDIO</div><h2>Remixes</h2><p>Related remixes for this track.</p></div></div>{remixesLoading ? <div className="inline-loading"><LoaderCircle className="spin" /> Loading remixes…</div> : <TrackList tracks={remixes || []} onMessage={onMessage} />}</section>
     <TrackComments trackId={track.track_id ?? id} />
-    {!user && <div className="notice-box"><CircleHelp size={17} /><span>Local favorites stay on this device. Sign in with Audius to save or repost tracks to your Audius account.</span><Link className="text-link" to="/login">Sign in</Link></div>}
+    {!user && <div className="notice-box"><CircleHelp size={17} /><span>Local favorites stay on this device. Sign in to save or repost tracks to your account.</span><Link className="text-link" to="/login">Sign in</Link></div>}
   </div>;
 }
 
@@ -1223,13 +1225,13 @@ function TrackComments({ trackId }) {
   return <section className="comments-section"><div className="section-heading"><div><div className="eyebrow">COMMUNITY</div><h2>Comments <span className="small-count">({comments.length})</span></h2></div></div>
     {user
       ? <form className="comment-form" onSubmit={submitComment}><textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} maxLength={1000} placeholder="Write a comment…" aria-label="Write a comment" required /><button className="button button-accent" disabled={posting || !commentText.trim()}><MessageCircle size={16} /> {posting ? "Posting…" : "Post comment"}</button></form>
-      : <p className="source-note"><Link className="text-link" to="/login">Sign in with Audius</Link> to join the conversation.</p>}
+      : <p className="source-note"><Link className="text-link" to="/login">Sign in</Link> to join the conversation.</p>}
     {loading && <div className="inline-loading"><LoaderCircle className="spin" /> Loading public comments…</div>}
     {!loading && error && <ErrorState message={error} onRetry={() => setRetryCount((value) => value + 1)} />}
-    {!loading && !error && comments.length > 0 && <div className="comment-list">{comments.map((comment) => <article className="comment-item" key={comment.id}><Artwork item={{ artwork: comment.user?.profile_picture }} className="comment-avatar" /><div><b>{comment.user?.name || comment.user?.handle || "Audius user"}</b><span>{comment.created_at ? new Date(comment.created_at).toLocaleString() : ""}</span><p>{comment.text || comment.message || ""}</p></div></article>)}</div>}
-    {!loading && !error && !comments.length && <EmptyState title="No public comments" body="Audius returned no comments for this track." />}
+    {!loading && !error && comments.length > 0 && <div className="comment-list">{comments.map((comment) => <article className="comment-item" key={comment.id}><Artwork item={{ artwork: comment.user?.profile_picture }} className="comment-avatar" /><div><b>{comment.user?.name || comment.user?.handle || "User"}</b><span>{comment.created_at ? new Date(comment.created_at).toLocaleString() : ""}</span><p>{comment.text || comment.message || ""}</p></div></article>)}</div>}
+    {!loading && !error && !comments.length && <EmptyState title="No public comments" body="There are no comments for this track." />}
     {!loading && !error && hasMore && <button className="button button-muted load-more" onClick={() => setOffset((value) => value + 20)}>Load more comments</button>}
-    <p className="source-note">Comments are posted to Audius using your authorized account.</p>
+    <p className="source-note">Comments are posted using your connected account.</p>
   </section>;
 }
 
@@ -1257,7 +1259,7 @@ function ArtistPage({ onMessage }) {
   }, [id, tab]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
-  usePageMetadata(profile?.name || profile?.handle, profile?.bio || `Discover tracks and releases from ${profile?.name || "this Audius artist"} on Soungdify.`);
+  usePageMetadata(profile?.name || profile?.handle, profile?.bio || `Discover tracks and releases from ${profile?.name || "this artist"} on Soungdify.`);
   useEffect(() => {
     const controller = new AbortController();
     setProfileLoading(true);
@@ -1267,14 +1269,14 @@ function ArtistPage({ onMessage }) {
       .finally(() => { if (!controller.signal.aborted) setProfileLoading(false); });
     return () => controller.abort();
   }, [id, profileRefresh]);
-  if (profileLoading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading Audius artist…</div></div>;
+  if (profileLoading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading artist…</div></div>;
   if (profileError) return <div className="page"><ErrorState message={profileError} onRetry={() => { setProfileLoading(true); setProfileRefresh((value) => value + 1); }} /></div>;
   const data = Array.isArray(content.data) ? content.data : [];
   const overviewData = !Array.isArray(content.data) ? content.data : null;
   const shareProfile = async () => {
     const url = window.location.href;
     try {
-      if (navigator.share) await navigator.share({ title: profile?.name || "Audius artist", url });
+      if (navigator.share) await navigator.share({ title: profile?.name || "Artist", url });
       else { await navigator.clipboard.writeText(url); onMessage("Artist link copied"); }
     } catch (error) {
       if (error.name !== "AbortError") onMessage("Could not share this profile from this browser.");
@@ -1297,7 +1299,7 @@ function ArtistPage({ onMessage }) {
     }
   };
   return <div className="page">
-    <div className="artist-hero"><Artwork item={{ artwork: profile?.cover_photo }} className="artist-cover" /><div className="artist-profile"><Artwork item={{ artwork: profile?.profile_picture }} className="artist-avatar" /><div><span className="eyebrow">AUDIOUS ARTIST</span><h1>{profile?.name || profile?.handle || "Artist"}</h1><p>@{profile?.handle || "artist"} · {formatCount(profile?.follower_count)} followers · {formatCount(profile?.followee_count)} following</p></div>{String(user?.userId) !== String(id) && <button className="button button-muted" onClick={followArtist} disabled={Boolean(user && accountLibraryLoading)}>{!user ? "Sign in to follow" : accountLibraryLoading ? "Loading…" : isFollowing ? "Following" : "Follow artist"}</button>}<button className="icon-button artist-share" onClick={shareProfile} aria-label="Share artist profile"><Share2 size={17} /></button></div></div>
+    <div className="artist-hero"><Artwork item={{ artwork: profile?.cover_photo }} className="artist-cover" /><div className="artist-profile"><Artwork item={{ artwork: profile?.profile_picture }} className="artist-avatar" /><div><span className="eyebrow">ARTIST</span><h1>{profile?.name || profile?.handle || "Artist"}</h1><p>@{profile?.handle || "artist"} · {formatCount(profile?.follower_count)} followers · {formatCount(profile?.followee_count)} following</p></div>{String(user?.userId) !== String(id) && <button className="button button-muted" onClick={followArtist} disabled={Boolean(user && accountLibraryLoading)}>{!user ? "Sign in to follow" : accountLibraryLoading ? "Loading…" : isFollowing ? "Following" : "Follow artist"}</button>}<button className="icon-button artist-share" onClick={shareProfile} aria-label="Share artist profile"><Share2 size={17} /></button></div></div>
     {profile?.bio && <p className="artist-bio">{profile.bio}</p>}
     <div className="search-tabs profile-tabs" role="tablist" aria-label="Artist profile sections">{tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "selected" : ""} onClick={() => setTab(item)}>{item[0].toUpperCase() + item.slice(1)}</button>)}</div>
     {content.loading && <div className="inline-loading"><LoaderCircle className="spin" /> Loading public {tab}…</div>}
@@ -1313,16 +1315,16 @@ function ArtistPage({ onMessage }) {
     {!content.loading && !content.error && ["tracks", "reposts", "favorites"].includes(tab) && <TrackList tracks={data.filter((item) => item.title)} onMessage={onMessage} />}
     {!content.loading && !content.error && ["albums", "playlists"].includes(tab) && <PlaylistGrid playlists={data} />}
     {!content.loading && !content.error && ["followers", "following"].includes(tab) && <UserGrid users={data} />}
-    <p className="source-note">Public profile data is read from Audius. Follow actions are sent to Audius when you are signed in.</p>
+    <p className="source-note">Follow actions are available when you are signed in.</p>
   </div>;
 }
 
 function UserGrid({ users }) {
   const people = users.map((entry) => entry.user || entry).filter((user) => user?.id);
-  if (!people.length) return <EmptyState title="No users to show" body="Audius returned no public profiles for this section." />;
+  if (!people.length) return <EmptyState title="No users to show" body="No public profiles were found for this section." />;
   return <div className="profile-grid">{people.map((user) => <Link className="profile-card" to={`/artists/${encodeURIComponent(user.id)}`} key={user.id}>
     <Artwork item={{ artwork: user.profile_picture }} className="profile-art artist-grid-art" />
-    <b>{user.name || user.handle || "Audius artist"}</b><span>@{user.handle || "artist"}</span><small>{formatCount(user.follower_count)} followers</small>
+    <b>{user.name || user.handle || "Artist"}</b><span>@{user.handle || "artist"}</span><small>{formatCount(user.follower_count)} followers</small>
   </Link>)}</div>;
 }
 
@@ -1330,8 +1332,8 @@ function PlaylistPage({ onMessage }) {
   const { id } = useParams();
   const { data: playlist, loading, error, retry } = usePageData((signal) => getPlaylist(id, signal), [id]);
   const { playFromQueue, addToQueue } = usePlayer();
-  usePageMetadata(playlist?.playlist_name || playlist?.name, playlist?.description || "Listen to an Audius playlist on Soungdify.");
-  if (loading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading Audius playlist…</div></div>;
+  usePageMetadata(playlist?.playlist_name || playlist?.name, playlist?.description || "Listen to a playlist on Soungdify.");
+  if (loading) return <div className="page"><div className="inline-loading"><LoaderCircle className="spin" /> Loading playlist…</div></div>;
   if (error || !playlist) return <div className="page"><ErrorState message={error || "Playlist not found."} onRetry={retry} /></div>;
   const tracks = playlist.tracks || [];
   const isAlbum = Boolean(playlist.is_album);
@@ -1344,10 +1346,10 @@ function PlaylistPage({ onMessage }) {
     }
   };
   return <div className="page">
-    <div className="playlist-hero"><Artwork item={playlist} className="detail-art" /><div><span className="eyebrow">AUDIOUS {isAlbum ? "ALBUM" : "PLAYLIST"}</span><h1>{playlist.playlist_name || playlist.name || (isAlbum ? "Album" : "Playlist")}</h1><p>{getArtist(playlist)} · {tracks.length} tracks{playlist.release_date ? ` · ${new Date(playlist.release_date).toLocaleDateString()}` : ""}</p><div className="detail-actions"><button className="button button-accent" disabled={!tracks.length} onClick={() => playFromQueue(tracks)}><Play size={16} fill="currentColor" /> Play {isAlbum ? "album" : "playlist"}</button><button className="button button-muted" disabled={!tracks.length} onClick={() => playFromQueue([...tracks].sort(() => Math.random() - 0.5))}><Shuffle size={16} /> Shuffle</button><button className="button button-muted" onClick={() => tracks.forEach((track) => addToQueue(track))}><Plus size={17} /> Add to queue</button><button className="button button-muted" onClick={share}><Share2 size={16} /> Share</button></div></div></div>
+    <div className="playlist-hero"><Artwork item={playlist} className="detail-art" /><div><span className="eyebrow">{isAlbum ? "ALBUM" : "PLAYLIST"}</span><h1>{playlist.playlist_name || playlist.name || (isAlbum ? "Album" : "Playlist")}</h1><p>{getArtist(playlist)} · {tracks.length} tracks{playlist.release_date ? ` · ${new Date(playlist.release_date).toLocaleDateString()}` : ""}</p><div className="detail-actions"><button className="button button-accent" disabled={!tracks.length} onClick={() => playFromQueue(tracks)}><Play size={16} fill="currentColor" /> Play {isAlbum ? "album" : "playlist"}</button><button className="button button-muted" disabled={!tracks.length} onClick={() => playFromQueue([...tracks].sort(() => Math.random() - 0.5))}><Shuffle size={16} /> Shuffle</button><button className="button button-muted" onClick={() => tracks.forEach((track) => addToQueue(track))}><Plus size={17} /> Add to queue</button><button className="button button-muted" onClick={share}><Share2 size={16} /> Share</button></div></div></div>
     <TrackList tracks={tracks} onMessage={onMessage} />
     {playlist.description && <section className="detail-description"><h2>About</h2><p>{playlist.description}</p></section>}
-    <div className="notice-box"><CircleHelp size={17} /><span>Audius playlist editing and reordering are not enabled. Use My playlists for local editable playlists; account favorites are available when signed in.</span><Link className="text-link" to="/playlists">Manage local playlists</Link></div>
+    <div className="notice-box"><CircleHelp size={17} /><span>Playlist editing and reordering are not available here. Use My playlists for local editable playlists; account favorites are available when signed in.</span><Link className="text-link" to="/playlists">Manage local playlists</Link></div>
   </div>;
 }
 
@@ -1430,21 +1432,20 @@ function SettingsPage({ onMessage, theme, setTheme }) {
       {artistSearchError && <p className={artistResults.length ? "muted" : "auth-error"} role="status">{artistSearchError}</p>}
       {listedArtists.length > 0 ? <div className="preference-artist-list">{listedArtists.map((artist) => {
         const selected = listeningPreferences.artists.some((entry) => getId(entry) === getId(artist));
-        return <label className={`preference-artist ${selected ? "selected" : ""}`} key={getId(artist)}><input type="checkbox" checked={selected} onChange={() => togglePreference("artists", artist)} /><Artwork item={{ artwork: artist.profile_picture }} className="preference-artist-art" /><span><b>{artist.name || artist.handle || "Audius artist"}</b><small>@{artist.handle || "artist"}</small></span></label>;
-      })}</div> : <p className="muted">Artist options will appear when Audius chart creators load.</p>}
+        return <label className={`preference-artist ${selected ? "selected" : ""}`} key={getId(artist)}><input type="checkbox" checked={selected} onChange={() => togglePreference("artists", artist)} /><Artwork item={{ artwork: artist.profile_picture }} className="preference-artist-art" /><span><b>{artist.name || artist.handle || "Artist"}</b><small>@{artist.handle || "artist"}</small></span></label>;
+      })}</div> : <p className="muted">Artist options will appear when creators load.</p>}
       <div className="preference-subheading"><div><h3>Playlists</h3><p>Choose playlists you want featured on Home.</p></div></div>
       {listedPlaylists.length > 0 ? <div className="preference-playlist-list">{listedPlaylists.map((playlist) => {
         const selected = listeningPreferences.playlists.some((entry) => getId(entry) === getId(playlist));
         return <label className="preference-playlist" key={getId(playlist)}><input type="checkbox" checked={selected} onChange={() => togglePreference("playlists", playlist)} /><Artwork item={playlist} className="preference-playlist-art" /><span><b>{playlist.playlist_name || playlist.name || "Untitled playlist"}</b><small>{getArtist(playlist)}</small></span></label>;
-      })}</div> : <p className="muted">Loading playlist choices from Audius…</p>}
+      })}</div> : <p className="muted">Loading playlist choices…</p>}
     </section>
     <section className="settings-card"><h2>Appearance</h2><p>Choose the interface theme for this browser.</p><div className="theme-options"><button className={theme === "dark" ? "chosen" : ""} onClick={() => setTheme("dark")}><Moon size={16} /> Dark</button><button className={theme === "light" ? "chosen" : ""} onClick={() => setTheme("light")}><Sun size={16} /> Light</button><button className={theme === "system" ? "chosen" : ""} onClick={() => setTheme("system")}><Settings size={16} /> System</button></div></section>
-    <section className="settings-card"><h2>Playback</h2><p>Control queue playback behavior and streaming speed.</p><label className="setting-toggle"><span><b>Autoplay next track</b><small>Continue through your queue, then use trending tracks if the queue ends.</small></span><input type="checkbox" checked={autoplay} onChange={(event) => setAutoplay(event.target.checked)} /></label><label className="setting-select"><span>Playback speed</span><select value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>{[0.75, 1, 1.25, 1.5, 2].map((rate) => <option value={rate} key={rate}>{rate}×</option>)}</select></label><p className="muted">Crossfade and Audius audio-quality selection are not exposed by the public player API.</p></section>
-    <section className="settings-card"><h2>Privacy & local data</h2><p>Local favorites ({favorites.length}), listening history ({history.length}), taste preferences, playback settings, and queue are stored in this browser only. Audius-account favorites remain on Audius.</p><div className="settings-actions"><button className="button button-muted" onClick={clearHistory}>Clear listening history</button><button className="button button-muted" onClick={clearSearches}>Clear search history</button></div></section>
+    <section className="settings-card"><h2>Playback</h2><p>Control queue playback behavior and streaming speed.</p><label className="setting-toggle"><span><b>Autoplay next track</b><small>Continue through your queue, then use trending tracks if the queue ends.</small></span><input type="checkbox" checked={autoplay} onChange={(event) => setAutoplay(event.target.checked)} /></label><label className="setting-select"><span>Playback speed</span><select value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>{[0.75, 1, 1.25, 1.5, 2].map((rate) => <option value={rate} key={rate}>{rate}×</option>)}</select></label><p className="muted">Crossfade and audio-quality selection are not available in the player.</p></section>
+    <section className="settings-card"><h2>Privacy & local data</h2><p>Local favorites ({favorites.length}), listening history ({history.length}), taste preferences, playback settings, and queue are stored in this browser only. Account favorites remain with your account.</p><div className="settings-actions"><button className="button button-muted" onClick={clearHistory}>Clear listening history</button><button className="button button-muted" onClick={clearSearches}>Clear search history</button></div></section>
     <section className="settings-card"><h2>Local playlists</h2><p>Manage playlists saved only in this browser.</p><Link className="button button-muted" to="/playlists">Open playlist manager</Link></section>
-    <section className="settings-card"><h2>Audius account</h2><p>{user ? `Connected as @${user.handle || user.name}.` : configured ? "Sign in to sync favorites and use Audius account actions." : "Set an Audius API key and OAuth callback to enable account features."}</p>{authError && <p className="auth-error" role="alert">{authError}</p>}{user ? <div className="settings-actions"><Link className="button button-muted" to="/profile">Open Audius profile</Link><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div> : <button className="button button-muted" onClick={login} disabled={!configured}><LogIn size={16} /> Sign in with Audius</button>}</section>
+    <section className="settings-card"><h2>Account</h2><p>{user ? `Connected as @${user.handle || user.name}.` : configured ? "Sign in to sync favorites and use account features." : "Account sign-in is currently unavailable."}</p>{authError && <p className="auth-error" role="alert">{authError}</p>}{user ? <div className="settings-actions"><Link className="button button-muted" to="/profile">Open profile</Link><button className="button button-muted" onClick={logout}><LogOut size={16} /> Sign out</button></div> : <button className="button button-muted" onClick={login} disabled={!configured}><LogIn size={16} /> Sign in</button>}</section>
     <section className="settings-card"><h2>Clear all local data</h2><p>This removes browser-local favorites, listening history, playlists, queue, and preferences.</p><button className="button button-danger" onClick={clearAll}>Clear all local data</button></section>
-    <section className="settings-card"><h2>Connected source</h2><p>Audius public discovery API</p><code>{getApiBase()}</code><p className="muted">Account actions use Audius OAuth with PKCE. The API key is a public client-side identifier; no app secret is used.</p></section>
   </div>;
 }
 
@@ -1556,9 +1557,9 @@ export default function App() {
           <Route path="/users/:id" element={<ArtistPage onMessage={notify} />} />
           <Route path="/playlists/:id" element={<PlaylistPage onMessage={notify} />} />
           <Route path="/albums/:id" element={<PlaylistPage onMessage={notify} />} />
-          <Route path="/feed" element={<UnavailableFeaturePage title="Social feed" feature="A personalized social feed" details="Audius feed activity is account- and follow-dependent. Browse public artists and their reposts from artist profiles instead." />} />
-          <Route path="/notifications" element={<UnavailableFeaturePage title="Notifications" feature="Audius notifications" details="The public discovery API does not expose a user notification inbox. No fake notifications are generated." />} />
-          <Route path="/remixes" element={<UnavailableFeaturePage title="Remix discovery" feature="A global remix catalog" details="Audius exposes remixes from individual track pages, but no public global remix catalog endpoint is available. Open a track page to view its remixes." />} />
+          <Route path="/feed" element={<UnavailableFeaturePage title="Social feed" feature="A personalized social feed" details="Browse artists and their reposts from artist profiles." />} />
+          <Route path="/notifications" element={<UnavailableFeaturePage title="Notifications" feature="Notifications" details="There is no notification inbox available in this app." />} />
+          <Route path="/remixes" element={<UnavailableFeaturePage title="Remix discovery" feature="A global remix catalog" details="Open a track page to view any related remixes." />} />
           <Route path="/login" element={<AudiusLoginPage />} />
           <Route path="/callback" element={<AudiusCallbackPage />} />
           <Route path="/profile" element={<AudiusAccountPage onMessage={notify} />} />

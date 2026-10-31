@@ -397,8 +397,8 @@ export function PlayerProvider({ children }) {
     if (!current || !("mediaSession" in navigator) || typeof MediaMetadata !== "function") return undefined;
     const artwork = getArtwork(current);
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: current.title || "Audius track",
-      artist: current.user?.name || current.artist || "Audius",
+      title: current.title || "Soungdify track",
+      artist: current.user?.name || current.artist || "Soungdify",
       album: current.album || "",
       ...(artwork ? { artwork: [{ src: artwork, sizes: "480x480", type: "image/jpeg" }] } : {}),
     });

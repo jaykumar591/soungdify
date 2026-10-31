@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
       })
       .catch((callbackError) => {
         setUser(null);
-        setError(callbackError.message || "Audius sign-in failed.");
+        setError(callbackError.message || "Sign-in failed.");
         setStatus("anonymous");
       });
     return undefined;
@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
       })
       .catch((restoreError) => {
         if (!active) return;
-        setError(restoreError.message || "Could not restore your Audius session.");
+        setError(restoreError.message || "Could not restore your session.");
         setStatus("anonymous");
       });
     return () => { active = false; };
@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
     try {
       await beginAudiusLogin();
     } catch (loginError) {
-      setError(loginError.message || "Could not start Audius sign-in.");
+      setError(loginError.message || "Could not start sign-in.");
       setStatus("anonymous");
     }
   }, []);
@@ -78,12 +78,12 @@ export function AuthProvider({ children }) {
     try {
       await revokeAudiusSession();
     } catch (logoutError) {
-      setError(logoutError.message || "Your local session was cleared, but Audius could not revoke it.");
+      setError(logoutError.message || "Your local session was cleared, but sign-out could not be completed.");
     }
   }, []);
 
   const accountRequest = useCallback((path, options) => {
-    if (!user) throw new Error("Sign in with Audius to use this feature.");
+    if (!user) throw new Error("Sign in to use this feature.");
     return audiusAccountRequest(path, options);
   }, [user]);
 
@@ -110,7 +110,7 @@ export function AuthProvider({ children }) {
       setError("");
     }).catch((requestError) => {
       if (!active) return;
-      setError(requestError.message || "Could not load your Audius library.");
+      setError(requestError.message || "Could not load your account library.");
     }).finally(() => {
       if (active) setAccountLibraryLoading(false);
     });
@@ -118,7 +118,7 @@ export function AuthProvider({ children }) {
   }, [accountRequest, user]);
 
   const toggleAudiusFavorite = useCallback(async (track) => {
-    if (!user || !track?.id) throw new Error("Sign in with Audius to save tracks to your account.");
+    if (!user || !track?.id) throw new Error("Sign in to save tracks to your account.");
     const isSaved = audiusFavorites.some((item) => favoriteTrackId(item) === String(track.id));
     const userId = encodeURIComponent(user.userId);
     const trackId = encodeURIComponent(track.id);
@@ -132,7 +132,7 @@ export function AuthProvider({ children }) {
   }, [accountRequest, audiusFavorites, user]);
 
   const toggleFollowing = useCallback(async (artistId) => {
-    if (!user) throw new Error("Sign in with Audius to follow artists.");
+    if (!user) throw new Error("Sign in to follow artists.");
     const isFollowed = following.some((item) => {
       return followedUserId(item) === String(artistId);
     });
@@ -148,16 +148,16 @@ export function AuthProvider({ children }) {
   }, [accountRequest, following, user]);
 
   const repostTrack = useCallback(async (track) => {
-    if (!user || !track?.id) throw new Error("Sign in with Audius to repost tracks.");
+    if (!user || !track?.id) throw new Error("Sign in to repost tracks.");
     const userId = encodeURIComponent(user.userId);
     const trackId = encodeURIComponent(track.id);
     return accountRequest(`/tracks/${trackId}/reposts?user_id=${userId}`, { method: "POST" });
   }, [accountRequest, user]);
 
   const postTrackComment = useCallback(async (trackId, text) => {
-    if (!user) throw new Error("Sign in with Audius to comment.");
+    if (!user) throw new Error("Sign in to comment.");
     if (!/^\d+$/.test(String(trackId))) {
-      throw new Error("Audius did not provide a comment-compatible track ID for this track.");
+      throw new Error("This track cannot be used for comments.");
     }
     const userId = encodeURIComponent(user.userId);
     return accountRequest(`/comments?user_id=${userId}`, {
@@ -167,7 +167,7 @@ export function AuthProvider({ children }) {
   }, [accountRequest, user]);
 
   const createAudiusPlaylist = useCallback(async (name, description = "") => {
-    if (!user) throw new Error("Sign in with Audius to create a playlist.");
+    if (!user) throw new Error("Sign in to create a playlist.");
     const playlistName = name.trim();
     if (!playlistName) throw new Error("Enter a playlist name.");
     const userId = encodeURIComponent(user.userId);
@@ -180,9 +180,9 @@ export function AuthProvider({ children }) {
   }, [accountRequest, user]);
 
   const updateAudiusPlaylist = useCallback(async (playlist, metadata) => {
-    if (!user) throw new Error("Sign in with Audius to edit your playlists.");
+    if (!user) throw new Error("Sign in to edit your playlists.");
     const playlistId = getId(playlist);
-    if (!playlistId) throw new Error("Audius did not return a playlist ID.");
+    if (!playlistId) throw new Error("The playlist could not be identified.");
     const userId = encodeURIComponent(user.userId);
     await accountRequest(`/playlists/${encodeURIComponent(playlistId)}?user_id=${userId}`, {
       method: "PUT",
@@ -193,30 +193,30 @@ export function AuthProvider({ children }) {
   }, [accountRequest, user]);
 
   const deleteAudiusPlaylist = useCallback(async (playlist) => {
-    if (!user) throw new Error("Sign in with Audius to delete your playlists.");
+    if (!user) throw new Error("Sign in to delete your playlists.");
     const playlistId = getId(playlist);
-    if (!playlistId) throw new Error("Audius did not return a playlist ID.");
+    if (!playlistId) throw new Error("The playlist could not be identified.");
     const userId = encodeURIComponent(user.userId);
     await accountRequest(`/playlists/${encodeURIComponent(playlistId)}?user_id=${userId}`, { method: "DELETE" });
     setAudiusPlaylists((items) => items.filter((item) => getId(item) !== playlistId));
   }, [accountRequest, user]);
 
   const addTrackToAudiusPlaylist = useCallback(async (playlist, track) => {
-    if (!user || !track?.id) throw new Error("Sign in with Audius to edit your playlists.");
+    if (!user || !track?.id) throw new Error("Sign in to edit your playlists.");
     const playlistId = getId(playlist);
     const trackId = String(track.track_id ?? track.id);
-    if (!playlistId) throw new Error("Audius did not return a playlist ID.");
-    if (!/^\d+$/.test(trackId)) throw new Error("Audius did not provide a playlist-compatible track ID.");
+    if (!playlistId) throw new Error("The playlist could not be identified.");
+    if (!/^\d+$/.test(trackId)) throw new Error("This track cannot be added to that playlist.");
     const details = await accountRequest(`/playlists/${encodeURIComponent(playlistId)}`);
     const currentTracks = Array.isArray(details.tracks) ? details.tracks : playlist.tracks;
     if (!Array.isArray(currentTracks) && Number(playlist.track_count) > 0) {
-      throw new Error("Audius did not return this playlist's current tracks; no changes were made.");
+      throw new Error("The playlist tracks could not be loaded, so no changes were made.");
     }
     const existing = Array.isArray(currentTracks) ? currentTracks : [];
     const getNumericTrackId = (item) => String(item.track_id ?? item.track?.track_id ?? item.id ?? item.track?.id ?? "");
     if (existing.some((item) => getNumericTrackId(item) === trackId)) return false;
     if (existing.some((item) => !/^\d+$/.test(getNumericTrackId(item)))) {
-      throw new Error("Audius returned a track ID that cannot be safely reordered.");
+      throw new Error("This track cannot be safely reordered.");
     }
     const playlistContents = [
       ...existing.map((item) => ({

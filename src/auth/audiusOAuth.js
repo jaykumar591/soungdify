@@ -31,7 +31,7 @@ function saveTokens(tokens) {
     localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
   } catch (error) {
     console.error("Unable to save Audius sign-in state.", error);
-    throw new AudiusAuthError("Browser storage is unavailable; Audius sign-in could not be saved.");
+    throw new AudiusAuthError("Browser storage is unavailable; sign-in could not be saved.");
   }
 }
 
@@ -53,10 +53,10 @@ async function parseResponse(response) {
   }
   if (!response.ok) {
     const message = payload?.error_description || payload?.message || payload?.error;
-    throw new AudiusAuthError(message || `Audius request failed (${response.status}).`, response.status);
+    throw new AudiusAuthError(String(message || "").replace(/https?:\/\/\S+|audius/gi, "music service") || `Music service request failed (${response.status}).`, response.status);
   }
   if (!payload || typeof payload !== "object") {
-    throw new AudiusAuthError("Audius returned an unexpected response.");
+    throw new AudiusAuthError("The music service returned an unexpected response.");
   }
   return payload;
 }
@@ -72,12 +72,12 @@ async function getProfile(accessToken) {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
   }));
   const user = authPayload(payload);
-  if (!user?.userId && !user?.id) throw new AudiusAuthError("Audius did not return a signed-in profile.");
+  if (!user?.userId && !user?.id) throw new AudiusAuthError("A signed-in profile could not be loaded.");
   return { ...user, userId: String(user.userId ?? user.id) };
 }
 
 async function refreshTokens(tokens) {
-  if (!apiKey) throw new AudiusAuthError("Add VITE_AUDIUS_API_KEY to enable Audius sign-in.");
+  if (!apiKey) throw new AudiusAuthError("Account sign-in is not configured. Contact the app administrator.");
   const response = await fetch(`${API_BASE}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -89,7 +89,7 @@ async function refreshTokens(tokens) {
   });
   const payload = authPayload(await parseResponse(response));
   if (!payload.access_token || !payload.refresh_token) {
-    throw new AudiusAuthError("Audius could not refresh the sign-in session.");
+    throw new AudiusAuthError("Your sign-in session could not be refreshed.");
   }
   const updated = {
     ...tokens,
@@ -105,7 +105,7 @@ let refreshInFlight;
 
 async function currentTokens(forceRefresh = false) {
   const tokens = getStoredTokens();
-  if (!tokens) throw new AudiusAuthError("Sign in with Audius to use this feature.");
+  if (!tokens) throw new AudiusAuthError("Sign in to use this feature.");
   if (!forceRefresh && tokens.expiresAt > Date.now() + 30_000) return tokens;
   if (!refreshInFlight) {
     refreshInFlight = refreshTokens(tokens).finally(() => { refreshInFlight = null; });
@@ -118,7 +118,7 @@ export function isAudiusAuthConfigured() {
 }
 
 export async function beginAudiusLogin() {
-  if (!apiKey) throw new AudiusAuthError("Add VITE_AUDIUS_API_KEY to enable Audius sign-in.");
+  if (!apiKey) throw new AudiusAuthError("Account sign-in is not configured. Contact the app administrator.");
   const redirectUri = getRedirectUri();
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
   const codeVerifier = base64Url(verifierBytes);
@@ -153,7 +153,7 @@ export function hasOAuthCallback() {
 }
 
 export async function completeAudiusLogin() {
-  if (!apiKey) throw new AudiusAuthError("Add VITE_AUDIUS_API_KEY to enable Audius sign-in.");
+  if (!apiKey) throw new AudiusAuthError("Account sign-in is not configured. Contact the app administrator.");
   const url = new URL(window.location.href);
   const params = new URLSearchParams(url.search);
   const fragment = new URLSearchParams(url.hash.slice(1));
@@ -162,13 +162,13 @@ export async function completeAudiusLogin() {
   const oauthState = JSON.parse(sessionStorage.getItem(OAUTH_STATE_KEY) || "null");
   sessionStorage.removeItem(OAUTH_STATE_KEY);
   if (params.has("error")) {
-    throw new AudiusAuthError(params.get("error_description") || "Audius sign-in was not completed.");
+    throw new AudiusAuthError((params.get("error_description") || "Sign-in was not completed.").replace(/https?:\/\/\S+|audius/gi, "music service"));
   }
   if (!oauthState?.state || params.get("state") !== oauthState.state) {
-    throw new AudiusAuthError("Audius sign-in could not be verified. Please try again.");
+    throw new AudiusAuthError("Sign-in could not be verified. Please try again.");
   }
   const code = params.get("code");
-  if (!code) throw new AudiusAuthError("Audius did not return a sign-in code.");
+  if (!code) throw new AudiusAuthError("A sign-in response could not be verified.");
 
   const tokenResponse = await fetch(`${API_BASE}/oauth/token`, {
     method: "POST",
@@ -183,7 +183,7 @@ export async function completeAudiusLogin() {
   });
   const tokenPayload = authPayload(await parseResponse(tokenResponse));
   if (!tokenPayload.access_token || !tokenPayload.refresh_token) {
-    throw new AudiusAuthError("Audius did not return a complete sign-in session.");
+    throw new AudiusAuthError("A complete sign-in session could not be created.");
   }
   const user = await getProfile(tokenPayload.access_token);
   const tokens = {
@@ -230,12 +230,12 @@ export async function revokeAudiusSession() {
     body: JSON.stringify({ token: tokens.refreshToken, client_id: apiKey }),
   });
   if (!response.ok) {
-    throw new AudiusAuthError(`Audius could not revoke the session (${response.status}).`, response.status);
+    throw new AudiusAuthError(`Sign-out could not be completed (${response.status}).`, response.status);
   }
 }
 
 export async function audiusAccountRequest(path, { method = "GET", body, signal } = {}) {
-  if (!apiKey) throw new AudiusAuthError("Add VITE_AUDIUS_API_KEY to use Audius account features.");
+  if (!apiKey) throw new AudiusAuthError("Account features are not configured.");
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("app_name", "soungdify");
   url.searchParams.set("api_key", apiKey);

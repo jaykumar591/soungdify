@@ -32,17 +32,17 @@ export async function audius(path, { signal, cacheMs = CACHE_MS } = {}) {
       detail = "";
     }
     if (response.status === 429) {
-      throw new AudiusError("Audius rate limit reached. Please wait a moment and retry.", 429);
+      throw new AudiusError("Music service rate limit reached. Please wait a moment and retry.", 429);
     }
     throw new AudiusError(
-      detail || `Audius request failed (${response.status}).`,
+      detail.replace(/https?:\/\/\S+|audius/gi, "music service") || `Music service request failed (${response.status}).`,
       response.status,
     );
   }
 
   const payload = await response.json();
   if (!payload || !("data" in payload)) {
-    throw new AudiusError("Audius returned an unexpected response.");
+    throw new AudiusError("The music service returned an unexpected response.");
   }
   cache.set(cacheKey, { data: payload.data, expiresAt: Date.now() + cacheMs });
   return payload.data;

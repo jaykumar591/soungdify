@@ -1,7 +1,7 @@
 {
   "name": "Soungdify — Independent music discovery",
   "short_name": "Soungdify",
-  "description": "Discover independent music with Audius.",
+  "description": "Discover and stream music with Soungdify.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111313",
