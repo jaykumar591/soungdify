@@ -1,0 +1,17 @@
+{
+  "name": "Soungdify — Independent music discovery",
+  "short_name": "Soungdify",
+  "description": "Discover independent music with Audius.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111313",
+  "theme_color": "#111313",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

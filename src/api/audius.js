@@ -48,33 +48,77 @@ export async function audius(path, { signal, cacheMs = CACHE_MS } = {}) {
   return payload.data;
 }
 
-export const getTrendingTracks = (signal) =>
-  audius("/tracks/trending?limit=24", { signal, cacheMs: 60_000 });
+function queryString(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
+  }
+  return search.toString();
+}
+
+export const getTrendingTracks = (signal, filters = {}) =>
+  audius(`/tracks/trending?${queryString({ limit: 24, ...filters })}`, { signal, cacheMs: 60_000 });
 
 export const getTrendingPlaylists = (signal) =>
-  audius("/playlists/trending?limit=12", { signal, cacheMs: 60_000 });
+  audius(`/playlists/trending?${queryString({ limit: 12 })}`, { signal, cacheMs: 60_000 });
 
-export const searchTracks = (query, signal) =>
-  audius(`/tracks/search?query=${encodeURIComponent(query)}&limit=30`, { signal });
+export const getRecentPlaylists = (signal) =>
+  audius(`/playlists?${queryString({ sort_method: "recent", limit: 12 })}`, { signal, cacheMs: 60_000 });
+
+export const searchTracks = (query, signal, options = {}) =>
+  audius(`/tracks/search?${queryString({ query, limit: 30, ...options })}`, { signal });
 
 export const searchUsers = (query, signal) =>
-  audius(`/users/search?query=${encodeURIComponent(query)}&limit=20`, { signal });
+  audius(`/users/search?${queryString({ query, limit: 20 })}`, { signal });
 
 export const searchPlaylists = (query, signal) =>
-  audius(`/playlists/search?query=${encodeURIComponent(query)}&limit=20`, { signal });
+  audius(`/playlists/search?${queryString({ query, limit: 30 })}`, { signal });
 
 export const getTrack = (id, signal) => audius(`/tracks/${encodeURIComponent(id)}`, { signal });
 
 export const getUser = (id, signal) => audius(`/users/${encodeURIComponent(id)}`, { signal });
 
 export const getUserTracks = (id, signal) =>
-  audius(`/users/${encodeURIComponent(id)}/tracks?limit=30`, { signal });
+  audius(`/users/${encodeURIComponent(id)}/tracks?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserAlbums = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/albums?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserPlaylists = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/playlists?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserReposts = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/reposts?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserFavorites = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/favorites?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserFollowers = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/followers?${queryString({ limit: 30 })}`, { signal });
+
+export const getUserFollowing = (id, signal) =>
+  audius(`/users/${encodeURIComponent(id)}/following?${queryString({ limit: 30 })}`, { signal });
+
+export const getTrackRemixes = (id, signal) =>
+  audius(`/tracks/${encodeURIComponent(id)}/remixes?${queryString({ limit: 20 })}`, { signal });
+
+export const getTrackComments = (id, signal, options = {}) =>
+  audius(`/tracks/${encodeURIComponent(id)}/comments?${queryString({ limit: 20, ...options })}`, { signal });
+
+export const getTrackFavorites = (id, signal) =>
+  audius(`/tracks/${encodeURIComponent(id)}/favorites?${queryString({ limit: 20 })}`, { signal });
 
 export const getPlaylist = (id, signal) =>
   audius(`/playlists/${encodeURIComponent(id)}`, { signal });
 
 export function getStreamUrl(trackId) {
   const url = new URL(`${apiBase}/tracks/${encodeURIComponent(trackId)}/stream`);
+  url.searchParams.set("app_name", appName);
+  return url.toString();
+}
+
+export function getDownloadUrl(trackId) {
+  const url = new URL(`${apiBase}/tracks/${encodeURIComponent(trackId)}/download`);
   url.searchParams.set("app_name", appName);
   return url.toString();
 }
