@@ -7,6 +7,10 @@ export default defineConfig({
     host: "0.0.0.0",
     port: Number(process.env.PORT) || 5173,
     strictPort: true,
+    allowedHosts: [
+      "soungdify.onrender.com",
+      ...(process.env.RENDER_EXTERNAL_HOSTNAME ? [process.env.RENDER_EXTERNAL_HOSTNAME] : []),
+    ],
   },
   preview: {
     host: "0.0.0.0",

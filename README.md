@@ -26,7 +26,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Vite binds to `0.0.0.0` so hosted services such as Render can detect it. The development server uses Render's `PORT` environment variable when provided, or `5173` locally (strict port). The preview server uses `PORT` when provided, or `4173`.
+Vite binds to `0.0.0.0` so hosted services such as Render can detect it. The development server uses Render's `PORT` environment variable when provided, or `5173` locally (strict port). The preview server uses `PORT` when provided, or `4173`. The Render hostname `soungdify.onrender.com` and the hostname in Render's `RENDER_EXTERNAL_HOSTNAME` variable are explicitly allowed.
 
 Environment variables are optional:
 
