@@ -26,6 +26,8 @@ cp .env.example .env
 npm run dev
 ```
 
+The development server uses `http://localhost:5173` (strict port). The preview server uses `http://localhost:4173`.
+
 Environment variables are optional:
 
 | Variable | Purpose | Default |
