@@ -4,7 +4,7 @@ Soungdify is a free React music discovery and streaming app using Audius public 
 
 ## What works
 
-- **Audius discovery:** trending tracks and playlists, recently created public playlists, genre/time chart filters, track/user/playlist search, artist profiles, profile tracks/albums/playlists/reposts/favorites/followers/following, and public playlist/album pages. The Home trending feed paginates as you scroll.
+- **Audius discovery:** Hindi-song search results on Home, a browsable catalog of 50 Hindi playback singers, trending playlists, recently created public playlists, genre/time chart filters, track/user/playlist search, artist profiles, profile tracks/albums/playlists/reposts/favorites/followers/following, and public playlist/album pages. Home Hindi tracks and track search results paginate as you scroll. Singer portraits are shown only when Audius returns an exact matching artist profile.
 - **Track details:** public metadata, artist/release links, play/favorite/repost counts, readable comments, and per-track remix listings when Audius returns them.
 - **Artist-enabled downloads:** active download buttons use Audius's official track-download endpoint and appear only for tracks marked downloadable by Audius. Tracks with downloads disabled by the artist cannot be downloaded here.
 - **Audius account actions:** OAuth 2.0 PKCE sign-in, session restore/revocation, cloud favorites, artist follow/unfollow, track reposts, posting comments, and create/edit/delete/add-track operations for your Audius playlists. These work after configuring a free Audius API key and registered callback URL.

@@ -17,6 +17,18 @@ import { usePlayer } from "./state/PlayerContext.jsx";
 import { useAuth } from "./state/AuthContext.jsx";
 
 const genres = ["Electronic", "Hip-Hop", "House", "Lo-Fi", "Pop", "Ambient", "Techno", "Jazz", "Rock", "R&B"];
+const hindiSingers = [
+  "Arijit Singh", "Shreya Ghoshal", "Sonu Nigam", "Lata Mangeshkar", "Kishore Kumar",
+  "Mohammed Rafi", "Asha Bhosle", "Udit Narayan", "Kumar Sanu", "Alka Yagnik",
+  "Mukesh", "Manna Dey", "S. P. Balasubrahmanyam", "K. S. Chithra", "Kavita Krishnamurthy",
+  "Sukhwinder Singh", "Shaan", "KK", "Sunidhi Chauhan", "Mohit Chauhan",
+  "Javed Ali", "Rahat Fateh Ali Khan", "Atif Aslam", "Shankar Mahadevan", "Hariharan",
+  "Abhijeet Bhattacharya", "Babul Supriyo", "Himesh Reshammiya", "Kailash Kher", "Mika Singh",
+  "Neha Kakkar", "Armaan Malik", "Jubin Nautiyal", "Darshan Raval", "Vishal Mishra",
+  "Sachet Tandon", "Parampara Tandon", "Palak Muchhal", "Monali Thakur", "Tulsi Kumar",
+  "Jonita Gandhi", "Dhvani Bhanushali", "Asees Kaur", "Shilpa Rao", "Rekha Bhardwaj",
+  "Papon", "Benny Dayal", "Anuradha Paudwal", "Suresh Wadkar", "Sapna Mukherjee",
+];
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
@@ -66,7 +78,7 @@ function useInfiniteTrendingTracks() {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    getTrendingTracks(controller.signal, { limit: pageSize, offset: 0 })
+    searchTracks("Hindi songs", controller.signal, { limit: pageSize, offset: 0 })
       .then((results) => {
         if (controller.signal.aborted) return;
         const nextTracks = Array.isArray(results) ? results : [];
@@ -89,7 +101,7 @@ function useInfiniteTrendingTracks() {
     loadingRef.current = true;
     setLoadingMore(true);
     try {
-      const results = await getTrendingTracks(undefined, { limit: pageSize, offset });
+      const results = await searchTracks("Hindi songs", undefined, { limit: pageSize, offset });
       const nextTracks = Array.isArray(results) ? results : [];
       setTracks((existing) => {
         const knownIds = new Set(existing.map((track) => String(track.id)));
@@ -364,6 +376,55 @@ function ArtistGrid({ artists }) {
   ))}</div>;
 }
 
+function HindiSingerCard({ name }) {
+  const [profile, setProfile] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const cardRef = useRef(null);
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card || !("IntersectionObserver" in window)) return undefined;
+    const controller = new AbortController();
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      searchUsers(name, controller.signal).then((users) => {
+        const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const match = (users || []).find((user) => {
+          const userName = String(user.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          const handle = String(user.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          return userName === normalizedName || handle === normalizedName;
+        });
+        if (match) setProfile(match);
+      }).catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error(`Unable to find an Audius profile for ${name}.`, error);
+          setFailed(true);
+        }
+      });
+    }, { rootMargin: "150px" });
+    observer.observe(card);
+    return () => {
+      observer.disconnect();
+      controller.abort();
+    };
+  }, [name]);
+  const href = profile?.id
+    ? `/artists/${encodeURIComponent(profile.id)}`
+    : `/search?q=${encodeURIComponent(name)}&type=tracks`;
+  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
+  return <Link className="singer-card" to={href} ref={cardRef} title={`Find Hindi songs by ${name}`}>
+    {profile && getArtwork({ artwork: profile.profile_picture })
+      ? <Artwork item={{ artwork: profile.profile_picture }} className="singer-art" />
+      : <span className="singer-art singer-initials" aria-hidden="true">{initials}</span>}
+    <span className="singer-name">{name}</span>
+    <span className="singer-action">{profile ? "Open artist" : failed ? "Search songs" : "Find songs"} <ArrowRight size={13} /></span>
+  </Link>;
+}
+
+function HindiSingerGrid() {
+  return <div className="singer-grid">{hindiSingers.map((name) => <HindiSingerCard key={name} name={name} />)}</div>;
+}
+
 function RankedTracksSection({ title, eyebrow, tracks, metric, onMessage }) {
   const score = (track) => metric === "release_date"
     ? new Date(track.release_date || track.created_at || 0).getTime()
@@ -535,10 +596,10 @@ function HomePage({ onMessage }) {
   return <div className="page home-page">
     <section className="hero">
       <div className="hero-orb orb-one" /><div className="hero-orb orb-two" />
-      <div className="hero-copy"><span className="eyebrow"><span className="live-dot" /> Powered by Audius</span><h1>Find your next<br /><em>favorite sound.</em></h1><p>Independent music discovery, made for the curious.</p><button className="button button-accent" onClick={() => navigate("/discover")}><Sparkles size={17} /> Explore what’s trending</button></div>
+      <div className="hero-copy"><span className="eyebrow"><span className="live-dot" /> HINDI MUSIC · AUDIOUS</span><h1>Apna agla<br /><em>favorite gaana.</em></h1><p>Hindi songs discover karein — naye artists aur popular awaazon ke saath.</p><button className="button button-accent" onClick={() => navigate("/search?q=Hindi%20songs&type=tracks")}><Sparkles size={17} /> Hindi gaane explore karein</button></div>
       <div className="hero-art" aria-hidden="true"><div className="hero-record"><div className="record-groove" /><div className="record-label"><AudioLines size={34} /></div></div><div className="hero-sticker">NEW<br />SOUNDS<br /><span>DAILY</span></div></div>
     </section>
-    <div className="section-heading"><div><div className="eyebrow">AUDIOUS CHARTS</div><h2>Trending right now</h2><p>Tracks listeners are discovering across Audius. More load as you scroll.</p></div><Link className="text-link" to="/discover">Explore all <ArrowRight size={15} /></Link></div>
+    <div className="section-heading"><div><div className="eyebrow">HINDI SONGS ON AUDIOUS</div><h2>Hindi gaane</h2><p>Audius search results. Scroll karte hi agle tracks load honge.</p></div><Link className="text-link" to="/search?q=Hindi%20songs&type=tracks">Aur gaane dekhein <ArrowRight size={15} /></Link></div>
     {loading && <LoadingGrid />}
     {!loading && error && !tracks.length && <ErrorState message={error} onRetry={retry} />}
     {!loading && tracks.length > 0 && <TrackGrid tracks={tracks} onMessage={onMessage} />}
@@ -546,7 +607,11 @@ function HomePage({ onMessage }) {
     <div className="infinite-scroll-sentinel" ref={sentinelRef} aria-hidden="true" />
     {loadingMore && <div className="inline-loading"><LoaderCircle className="spin" size={18} /> Loading more tracks…</div>}
     {!loadingMore && hasMore && tracks.length > 0 && <button className="button button-muted load-more" onClick={loadMore}>Load more tracks</button>}
-    {!hasMore && tracks.length > 0 && <p className="source-note">You’ve reached the end of the currently available trending results.</p>}
+    {!hasMore && tracks.length > 0 && <p className="source-note">Audius par abhi ke Hindi song search results yahan tak the.</p>}
+    <section className="discovery-section hindi-singers-section">
+      <div className="section-heading"><div><div className="eyebrow">HINDI PLAYBACK SINGERS</div><h2>Apne pasandida singer ko chunein</h2><p>50 singer names browse karein. Click karke unke Audius songs ya artist profile kholen.</p></div></div>
+      <HindiSingerGrid />
+    </section>
     {listeningPreferences.genres.length > 0 && <section className="discovery-section">
       <div className="section-heading"><div><div className="eyebrow">YOUR LISTENING TASTE</div><h2>Your favorite sounds</h2></div><Link className="text-link" to="/settings">Edit preferences <Settings size={14} /></Link></div>
       <div className="mood-chips">{listeningPreferences.genres.map((genre) => <Link key={genre} to={`/genres/${encodeURIComponent(genre)}`}>{genre}</Link>)}</div>
@@ -823,6 +888,13 @@ function SearchPage({ onMessage, query, setQuery }) {
   const [retryCount, setRetryCount] = useState(0);
   const [recent, setRecent] = useState(() => readLocal("soungdify.searches", []));
   const timer = useRef(null);
+  const trackSentinelRef = useRef(null);
+  const trackLoadMoreRef = useRef(false);
+  const loadMoreTracks = () => {
+    if (trackLoadMoreRef.current || loading || !hasMore) return;
+    trackLoadMoreRef.current = true;
+    setOffset((value) => value + 30);
+  };
   const search = (term) => {
     const next = term.trim();
     if (!next) return;
@@ -837,7 +909,11 @@ function SearchPage({ onMessage, query, setQuery }) {
   useEffect(() => {
     const fromUrl = params.get("q") || "";
     if (fromUrl && fromUrl !== query) setQuery(fromUrl);
-  }, [params, query, setQuery]);
+    if (params.get("type") === "tracks" && tab !== "tracks") {
+      setTab("tracks");
+      setOffset(0);
+    }
+  }, [params, query, setQuery, tab]);
   useEffect(() => {
     const term = query.trim();
     if (term.length < 2) {
@@ -846,6 +922,7 @@ function SearchPage({ onMessage, query, setQuery }) {
       setLoading(false);
       return undefined;
     }
+    if (!offset) trackLoadMoreRef.current = false;
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -865,7 +942,11 @@ function SearchPage({ onMessage, query, setQuery }) {
           setHasMore(false);
         } else if (tab === "tracks") {
           const data = await searchTracks(term, controller.signal, { offset, limit: 30 });
-          setResults((previous) => offset ? [...previous, ...(data || [])] : Array.isArray(data) ? data : []);
+          setResults((previous) => {
+            if (!offset) return Array.isArray(data) ? data : [];
+            const knownIds = new Set(previous.map((track) => String(track.id)));
+            return [...previous, ...(data || []).filter((track) => !knownIds.has(String(track.id)))];
+          });
           setHasMore(Array.isArray(data) && data.length === 30);
         } else if (tab === "artists") {
           const data = await searchUsers(term, controller.signal);
@@ -884,7 +965,10 @@ function SearchPage({ onMessage, query, setQuery }) {
       } catch (requestError) {
         if (requestError.name !== "AbortError") setError(getErrorMessage(requestError));
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          if (tab === "tracks" && offset > 0) trackLoadMoreRef.current = false;
+        }
       }
     }, 350);
     return () => {
@@ -892,6 +976,17 @@ function SearchPage({ onMessage, query, setQuery }) {
       controller.abort();
     };
   }, [query, tab, offset, retryCount]);
+  useEffect(() => {
+    const sentinel = trackSentinelRef.current;
+    if (!sentinel || tab !== "tracks" || !hasMore || loading || error || !("IntersectionObserver" in window)) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        loadMoreTracks();
+      }
+    }, { rootMargin: "500px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [tab, hasMore, loading, error, offset, results]);
   const tabs = ["all", "tracks", "artists", "albums", "playlists", "tags"];
   const submitSearch = (term) => {
     search(term);
@@ -910,7 +1005,7 @@ function SearchPage({ onMessage, query, setQuery }) {
       {!loading && !error && tab === "all" && results.tracks?.length > 0 && <section className="search-preview"><div className="section-heading small-heading"><div><h2>Tracks</h2></div><button className="text-link button-reset" onClick={() => setTab("tracks")}>See all</button></div><TrackList tracks={results.tracks} onMessage={onMessage} /></section>}
       {!loading && !error && tab === "all" && results.artists?.length > 0 && <section className="search-preview"><div className="section-heading small-heading"><div><h2>Artists</h2></div><button className="text-link button-reset" onClick={() => setTab("artists")}>See all</button></div>{showProfiles(results.artists)}</section>}
       {!loading && !error && tab === "all" && results.playlists?.length > 0 && <section className="search-preview"><div className="section-heading small-heading"><div><h2>Playlists & albums</h2></div><button className="text-link button-reset" onClick={() => setTab("playlists")}>See all</button></div>{showPlaylists(results.playlists)}</section>}
-      {!loading && !error && tab === "tracks" && results.length > 0 && <><TrackList tracks={results} onMessage={onMessage} />{hasMore && <button className="button button-muted load-more" onClick={() => setOffset((value) => value + 30)}>Load more tracks</button>}</>}
+      {!error && tab === "tracks" && results.length > 0 && <><TrackList tracks={results} onMessage={onMessage} />{loading && <div className="inline-loading"><LoaderCircle className="spin" size={18} /> Loading more tracks…</div>}{hasMore && <><div className="infinite-scroll-sentinel" ref={trackSentinelRef} aria-hidden="true" /><button className="button button-muted load-more" onClick={loadMoreTracks} disabled={loading}>Load more tracks</button></>}</>}
       {!loading && !error && tab === "artists" && results.length > 0 && showProfiles(results)}
       {!loading && !error && tab === "playlists" && results.length > 0 && showPlaylists(results)}
       {!loading && !error && tab === "albums" && results.length > 0 && <PlaylistGrid playlists={results} />}
