@@ -26,7 +26,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The development server uses `http://localhost:5173` (strict port). The preview server uses `http://localhost:4173`.
+Vite binds to `0.0.0.0` so hosted services such as Render can detect it. The development server uses Render's `PORT` environment variable when provided, or `5173` locally (strict port). The preview server uses `PORT` when provided, or `4173`.
 
 Environment variables are optional:
 
